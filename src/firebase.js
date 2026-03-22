@@ -2,7 +2,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBmLfor474iCeiGKtkB6_5bRUgBxqjLRmQ",
@@ -10,13 +9,11 @@ const firebaseConfig = {
   projectId: "sokoflix1",
   storageBucket: "sokoflix1.firebasestorage.app",
   messagingSenderId: "23935742126",
-  appId: "1:23935742126:web:e7c1dc9c2a031da292bd3f",
-  measurementId: "G-9XDVWJXYVT"
+  appId: "1:23935742126:web:e7c1dc9c2a031da292bd3f"
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
 
 // Initialize Services
 export const auth = getAuth(app);
