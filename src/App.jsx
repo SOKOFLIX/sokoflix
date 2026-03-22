@@ -29,7 +29,6 @@ const Icons = {
   FilterSort: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
 };
 
-// Generate list of years dynamically for the filter dropdown
 const currentYear = 2026;
 const YEARS = Array.from(new Array(40), (val, index) => currentYear - index);
 
@@ -47,13 +46,6 @@ export default function App() {
   const [mediaType, setMediaType] = useState('movie');
   const [currentTab, setCurrentTab] = useState('Home'); 
   
-  const [season, setSeason] = useState(1);
-  const [episode, setEpisode] = useState(1);
-  const [itemDetails, setItemDetails] = useState(null);
-  const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
-  const [heroLogo, setHeroLogo] = useState(null);
-
-  // --- NEW: FILTER STATES ---
   const [browseItems, setBrowseItems] = useState([]);
   const [availableGenres, setAvailableGenres] = useState([]);
   
@@ -63,7 +55,6 @@ export default function App() {
   const [filterRating, setFilterRating] = useState('');
   const [filterSort, setFilterSort] = useState('popularity.desc');
 
-  // Helper to clear filters
   const resetFilters = () => {
     setFilterGenre(''); setFilterLang(''); setFilterYear(''); setFilterRating(''); setFilterSort('popularity.desc');
   };
@@ -74,7 +65,7 @@ export default function App() {
     setSearchQuery('');
     if (type) {
       setMediaType(type);
-      resetFilters(); // Reset filters when switching between Movies and TV Shows
+      resetFilters();
     }
     if (tabName === 'Search') setIsSearchActive(true);
     else setIsSearchActive(false);
@@ -88,7 +79,6 @@ export default function App() {
     }
   }, [activeItem, mediaType]);
 
-  // Fetch Genres specifically for the current mediaType (Movies have different genre IDs than TV Shows)
   useEffect(() => {
     fetch(`${BASE_URL}/genre/${mediaType}/list?api_key=${TMDB_API_KEY}`)
       .then(res => res.json())
@@ -114,20 +104,15 @@ export default function App() {
     }
   }, [mediaType, currentTab]);
 
-  // --- UPDATED: BROWSE FETCH LOGIC WITH ACTIVE FILTERS ---
   useEffect(() => {
     if (currentTab === 'Movies' || currentTab === 'TV Shows') {
       let url = `${BASE_URL}/discover/${mediaType}?api_key=${TMDB_API_KEY}&sort_by=${filterSort}`;
-      
-      // Inject filters into the URL only if the user has selected them
       if (filterGenre) url += `&with_genres=${filterGenre}`;
       if (filterLang) url += `&with_original_language=${filterLang}`;
       if (filterRating) url += `&vote_average.gte=${filterRating}`;
       if (filterYear) {
-        // TMDB uses different parameter names for movie release year vs tv show air year
         url += mediaType === 'movie' ? `&primary_release_year=${filterYear}` : `&first_air_date_year=${filterYear}`;
       }
-
       fetch(url)
         .then(res => res.json())
         .then(data => setBrowseItems(data.results || []))
@@ -145,6 +130,12 @@ export default function App() {
   const heroItem = trendingDay[heroIndex];
   const nextHero = () => setHeroIndex((prev) => (prev + 1) % Math.min(trendingDay.length, 5));
   const prevHero = () => setHeroIndex((prev) => (prev === 0 ? Math.min(trendingDay.length, 5) - 1 : prev - 1));
+
+  const [season, setSeason] = useState(1);
+  const [episode, setEpisode] = useState(1);
+  const [itemDetails, setItemDetails] = useState(null);
+  const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
+  const [heroLogo, setHeroLogo] = useState(null);
 
   useEffect(() => {
     if (heroItem && currentTab === 'Home') {
@@ -221,10 +212,68 @@ export default function App() {
           .header-left { gap: 15px; }
           .header-nav { padding: 15px 20px; }
           .search-bar-container { width: 100%; padding: 0 20px; margin-top: 10px; }
-          .mobile-bottom-nav { display: flex; justify-content: space-around; align-items: center; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: 92%; background-color: rgba(15, 23, 42, 0.85); backdrop-filter: blur(15px); padding: 10px 5px; border-radius: 30px; z-index: 1000; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); }
-          .mob-nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #64748b; font-size: 0.75rem; font-weight: bold; cursor: pointer; position: relative; padding: 8px 15px; border-radius: 20px; transition: all 0.3s ease; }
-          .mob-nav-item.active { color: #60a5fa; background-color: rgba(30, 58, 138, 0.4); }
-          .mob-nav-item.active::before { content: ''; position: absolute; top: 2px; width: 4px; height: 4px; background-color: #60a5fa; border-radius: 50%; }
+          
+          /* --- THE UPDATED MOBILE NAV --- */
+          .mobile-bottom-nav { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            position: fixed; 
+            bottom: 25px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            width: calc(100% - 40px); 
+            max-width: 450px; 
+            background-color: rgba(15, 23, 42, 0.95); 
+            backdrop-filter: blur(20px); 
+            padding: 8px 6px; 
+            border-radius: 40px; 
+            z-index: 1000; 
+            box-shadow: 0 20px 40px rgba(0,0,0,0.8); 
+            border: 1px solid rgba(255,255,255,0.05); 
+            box-sizing: border-box; 
+          }
+          
+          .mob-nav-item { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 5px; 
+            color: #64748b; 
+            font-size: 0.75rem; 
+            font-weight: 700; 
+            cursor: pointer; 
+            position: relative; 
+            padding: 12px 0 10px 0; 
+            border-radius: 30px; 
+            transition: all 0.3s ease; 
+            flex: 1; 
+            -webkit-tap-highlight-color: transparent; 
+          }
+          
+          .mob-nav-item.active { 
+            color: #93c5fd; 
+            background-color: #1e3a8a; 
+          }
+          
+          .mob-nav-item.active::before { 
+            content: ''; 
+            position: absolute; 
+            top: 6px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            width: 4px; 
+            height: 4px; 
+            background-color: #93c5fd; 
+            border-radius: 50%; 
+          }
+          
+          .mob-nav-item svg { width: 22px; height: 22px; transition: transform 0.2s ease; }
+          .mob-nav-item.active svg { transform: translateY(2px); }
+          .mob-nav-item span { transition: transform 0.2s ease; }
+          .mob-nav-item.active span { transform: translateY(2px); display: inline-block; }
+          /* ------------------------------ */
           
           .carousel-container { height: 75vh !important; align-items: flex-end !important; }
           .hero-content { padding: 0 20px 30px 20px !important; text-align: left !important; width: 100%; box-sizing: border-box; }
