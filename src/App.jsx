@@ -74,7 +74,8 @@ export default function App() {
   useEffect(() => {
     setSeason(1); setEpisode(1); setItemDetails(null); setIsOverviewExpanded(false);
     if (activeItem) {
-      fetch(`${BASE_URL}/${mediaType}/${activeItem.id}?api_key=${TMDB_API_KEY}`)
+      // UPDATED: Added &append_to_response=credits to get the cast info in the same request!
+      fetch(`${BASE_URL}/${mediaType}/${activeItem.id}?api_key=${TMDB_API_KEY}&append_to_response=credits`)
         .then(res => res.json()).then(data => setItemDetails(data));
     }
   }, [activeItem, mediaType]);
@@ -247,7 +248,6 @@ export default function App() {
           .player-meta img { width: 120px !important; }
           .mobile-hide { display: none !important; }
 
-          /* FIX: Overriding the negative margin to prevent overlapping on mobile */
           .section-padding { padding: 0 20px !important; margin-top: 20px !important; }
           
           .browse-container { padding: 40px 15px 120px 15px !important; } 
@@ -372,6 +372,33 @@ export default function App() {
                   {isOverviewExpanded ? 'Show Less' : 'Read More'}
                 </button>
               )}
+
+              {/* NEW: CAST UI */}
+              {itemDetails?.credits?.cast && itemDetails.credits.cast.length > 0 && (
+                <div style={{ marginTop: '30px' }}>
+                  <h3 style={{ fontSize: '1.1rem', marginBottom: '12px', fontWeight: 'bold' }}>Top Cast</h3>
+                  <div className="hide-scroll" style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px' }}>
+                    {itemDetails.credits.cast.slice(0, 8).map(actor => (
+                      <div key={actor.id} style={{ minWidth: '90px', width: '90px', textAlign: 'center' }}>
+                        {actor.profile_path ? (
+                          <img 
+                            src={`https://image.tmdb.org/t/p/w185${actor.profile_path}`} 
+                            alt={actor.name} 
+                            style={{ width: '75px', height: '75px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #334155', margin: '0 auto 8px auto', display: 'block' }} 
+                          />
+                        ) : (
+                          <div style={{ width: '75px', height: '75px', borderRadius: '50%', backgroundColor: '#1e293b', border: '2px solid #334155', margin: '0 auto 8px auto', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                          </div>
+                        )}
+                        <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#cbd5e1', lineHeight: '1.2', marginBottom: '4px' }}>{actor.name}</div>
+                        <div style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.2' }}>{actor.character}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
             </div>
           </div>
         </div>
