@@ -29,8 +29,7 @@ const Icons = {
   FilterYear: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>,
   FilterRating: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>,
   FilterClear: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>,
-  FilterSort: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>,
-  User: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+  FilterSort: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
 };
 
 const currentYear = 2026;
@@ -62,7 +61,6 @@ export default function App() {
   // Firebase Auth & Library State
   const [user, setUser] = useState(null);
   const [myLibrary, setMyLibrary] = useState([]);
-  const [isInLibrary, setIsInLibrary] = useState(false);
 
   // Monitor User Login Status
   useEffect(() => {
@@ -88,15 +86,6 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    if (activeItem && user) {
-      const found = myLibrary.find(item => item.id === activeItem.id);
-      setIsInLibrary(!!found);
-    } else {
-      setIsInLibrary(false);
-    }
-  }, [activeItem, myLibrary, user]);
-
   const handleAuth = async () => {
     if (user) {
       setCurrentTab('Account');
@@ -114,23 +103,28 @@ export default function App() {
     setCurrentTab('Home');
   };
 
-  const toggleLibrary = async () => {
+  // Upgraded toggleLibrary to accept any specific item (like the hero banner!)
+  const toggleLibrary = async (targetItem) => {
     if (!user) {
       alert("Please sign in with Google to save to Watch Later!");
       return;
     }
+    if (!targetItem) return;
+
+    const isSaved = myLibrary.some(item => item.id === targetItem.id);
+
     try {
-      if (isInLibrary) {
-        const itemToRemove = myLibrary.find(item => item.id === activeItem.id);
+      if (isSaved) {
+        const itemToRemove = myLibrary.find(item => item.id === targetItem.id);
         await deleteDoc(doc(db, "users", user.uid, "library", itemToRemove.docId));
       } else {
         const itemData = {
-          id: activeItem.id,
-          title: getTitle(activeItem),
-          poster_path: activeItem.poster_path,
-          vote_average: activeItem.vote_average,
-          release_date: activeItem.release_date || activeItem.first_air_date || '',
-          media_type: mediaType
+          id: targetItem.id,
+          title: getTitle(targetItem),
+          poster_path: targetItem.poster_path,
+          vote_average: targetItem.vote_average,
+          release_date: targetItem.release_date || targetItem.first_air_date || '',
+          media_type: targetItem.media_type || mediaType || 'movie'
         };
         await addDoc(collection(db, "users", user.uid, "library"), itemData);
       }
@@ -139,6 +133,9 @@ export default function App() {
       console.error("Error updating library:", error);
     }
   };
+
+  // Reusable check to see if any item is in the library
+  const checkInLibrary = (id) => myLibrary.some(item => item.id === id);
 
   const resetFilters = () => {
     setFilterGenre(''); setFilterLang(''); setFilterYear(''); setFilterRating(''); setFilterSort('popularity.desc');
@@ -287,12 +284,16 @@ export default function App() {
         .nav-item.active { color: #fff; }
         .nav-item.active::after { content: ''; position: absolute; bottom: -16px; left: 0; width: 100%; height: 3px; background-color: #fff; border-radius: 2px; }
         
-        .header-left { display: flex; align-items: center; gap: 30px; }
-        .search-btn { display: flex; align-items: center; justify-content: center; width: 45px; height: 45px; background-color: #1e293b; border-radius: 12px; cursor: pointer; color: #fff; }
+        .header-left { display: flex; align-items: center; gap: 40px; }
+        .header-right { display: flex; align-items: center; gap: 20px; }
+        
+        .search-btn { display: flex; align-items: center; justify-content: center; width: 45px; height: 45px; background-color: #1e293b; border-radius: 12px; cursor: pointer; color: #fff; transition: background 0.2s; }
+        .search-btn:hover { background-color: #334155; }
         
         .auth-btn { display: flex; align-items: center; gap: 8px; background-color: #dc2626; color: #fff; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: background 0.2s; font-size: 0.9rem; }
         .auth-btn:hover { background-color: #b91c1c; }
-        .user-avatar { width: 38px; height: 38px; border-radius: 50%; border: 2px solid #ef4444; cursor: pointer; object-fit: cover; }
+        .user-avatar { width: 42px; height: 42px; border-radius: 50%; border: 2px solid #2563eb; cursor: pointer; object-fit: cover; transition: border-color 0.2s; }
+        .user-avatar:hover { border-color: #60a5fa; }
 
         .mobile-bottom-nav { display: none; }
         .footer { background-color: #03050a; padding: 60px 40px 40px; border-top: 1px solid #1e293b; margin-top: 60px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 40px; }
@@ -321,24 +322,24 @@ export default function App() {
 
         @media (max-width: 900px) {
           .nav-links { display: none; }
+          .header-nav { padding: 15px 20px; justify-content: space-between; }
           .header-left { gap: 15px; }
-          .header-nav { padding: 15px 20px; }
           .search-bar-container { width: 100%; padding: 0 20px; margin-top: 10px; }
           
           .media-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
           
+          /* FIX: Tighter padding, perfectly synced border-radius to match outer pill shape */
           .mobile-bottom-nav { 
-            display: flex; justify-content: space-between; align-items: center; position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); width: calc(100% - 40px); max-width: 450px; background-color: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px); padding: 8px 6px; border-radius: 40px; z-index: 1000; box-shadow: 0 20px 40px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.05); box-sizing: border-box; 
+            display: flex; justify-content: space-between; align-items: center; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: calc(100% - 30px); max-width: 450px; background-color: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px); padding: 4px; border-radius: 40px; z-index: 1000; box-shadow: 0 20px 40px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.05); box-sizing: border-box; 
           }
           .mob-nav-item { 
-            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; color: #64748b; font-size: 0.75rem; font-weight: 700; cursor: pointer; position: relative; padding: 12px 0 10px 0; border-radius: 30px; transition: all 0.3s ease; flex: 1; -webkit-tap-highlight-color: transparent; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; color: #64748b; font-size: 0.7rem; font-weight: 700; cursor: pointer; position: relative; padding: 10px 0; border-radius: 36px; transition: all 0.3s ease; flex: 1; -webkit-tap-highlight-color: transparent; 
           }
           .mob-nav-item.active { color: #93c5fd; background-color: #1e3a8a; }
-          .mob-nav-item.active::before { content: ''; position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; background-color: #93c5fd; border-radius: 50%; }
-          .mob-nav-item svg { width: 22px; height: 22px; transition: transform 0.2s ease; }
-          .mob-nav-item.active svg { transform: translateY(2px); }
+          .mob-nav-item svg { width: 20px; height: 20px; transition: transform 0.2s ease; }
+          .mob-nav-item.active svg { transform: translateY(1px); }
           .mob-nav-item span { transition: transform 0.2s ease; }
-          .mob-nav-item.active span { transform: translateY(2px); display: inline-block; }
+          .mob-nav-item.active span { transform: translateY(1px); display: inline-block; }
           
           .carousel-container { height: 85vh !important; min-height: 600px; align-items: flex-end !important; padding-bottom: 40px !important; }
           .hero-content { padding: 0 20px 30px 20px !important; text-align: left !important; width: 100%; box-sizing: border-box; }
@@ -372,7 +373,30 @@ export default function App() {
 
       {/* --- DESKTOP HEADER --- */}
       <header className="header-nav">
+        
+        {/* LOGO & NAV LINKS (LEFT) */}
         <div className="header-left">
+          <div onClick={() => handleNavClick('Home', 'movie')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', cursor: 'pointer' }}>
+            <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '900', letterSpacing: '1px', color: '#fff', lineHeight: 1 }}>
+              SOKO<span style={{color: '#ef4444'}}>FLIX</span>
+            </h1>
+            {/* UPDATED: Deeper blue and perfectly left aligned */}
+            <div style={{ fontSize: '0.8rem', color: '#2563eb', marginTop: '2px', fontWeight: 'bold', alignSelf: 'flex-start' }}>
+              by soko ecom
+            </div>
+          </div>
+
+          <div className="nav-links">
+            <div className={`nav-item ${currentTab === 'Home' ? 'active' : ''}`} onClick={() => handleNavClick('Home', 'movie')}>{Icons.Home} Home</div>
+            <div className={`nav-item ${currentTab === 'Movies' ? 'active' : ''}`} onClick={() => handleNavClick('Movies', 'movie')}>{Icons.Movies} Movies</div>
+            <div className={`nav-item ${currentTab === 'TV Shows' ? 'active' : ''}`} onClick={() => handleNavClick('TV Shows', 'tv')}>{Icons.TV} TV Shows</div>
+            <div className={`nav-item ${currentTab === 'Anime' ? 'active' : ''}`} onClick={() => handleNavClick('Anime')}>{Icons.Anime} Anime</div>
+            <div className={`nav-item ${currentTab === 'Watch Later' ? 'active' : ''}`} onClick={() => handleNavClick('Watch Later')}>{Icons.Library} Watch Later</div>
+          </div>
+        </div>
+
+        {/* SEARCH & PROFILE (RIGHT) */}
+        <div className="header-right">
           <div className="search-btn" onClick={() => { setIsSearchActive(!isSearchActive); setCurrentTab('Search'); }}>
             {Icons.Search}
           </div>
@@ -386,22 +410,6 @@ export default function App() {
           )}
         </div>
 
-        <div onClick={() => handleNavClick('Home', 'movie')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
-          <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '900', letterSpacing: '1px', color: '#fff', lineHeight: 1 }}>
-            SOKO<span style={{color: '#ef4444'}}>FLIX</span>
-          </h1>
-          <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '2px', fontWeight: 'bold' }}>
-            by <span style={{ color: '#60a5fa' }}>soko ecom</span>
-          </div>
-        </div>
-
-        <div className="nav-links">
-          <div className={`nav-item ${currentTab === 'Home' ? 'active' : ''}`} onClick={() => handleNavClick('Home', 'movie')}>{Icons.Home} Home</div>
-          <div className={`nav-item ${currentTab === 'Movies' ? 'active' : ''}`} onClick={() => handleNavClick('Movies', 'movie')}>{Icons.Movies} Movies</div>
-          <div className={`nav-item ${currentTab === 'TV Shows' ? 'active' : ''}`} onClick={() => handleNavClick('TV Shows', 'tv')}>{Icons.TV} TV Shows</div>
-          <div className={`nav-item ${currentTab === 'Anime' ? 'active' : ''}`} onClick={() => handleNavClick('Anime')}>{Icons.Anime} Anime</div>
-          <div className={`nav-item ${currentTab === 'Watch Later' ? 'active' : ''}`} onClick={() => handleNavClick('Watch Later')}>{Icons.Library} Watch Later</div>
-        </div>
       </header>
 
       {/* SEARCH BAR REVEAL */}
@@ -426,7 +434,7 @@ export default function App() {
          <div className="static-page" style={{ textAlign: 'center' }}>
            {user ? (
              <>
-               <img src={user.photoURL} alt="Profile" style={{ width: '100px', height: '100px', borderRadius: '50%', border: '4px solid #ef4444', marginBottom: '20px' }} />
+               <img src={user.photoURL} alt="Profile" style={{ width: '100px', height: '100px', borderRadius: '50%', border: '4px solid #ef4444', marginBottom: '20px', objectFit: 'cover' }} />
                <h1>Welcome, {user.displayName}</h1>
                <p style={{ fontSize: '1.2rem', color: '#94a3b8' }}>{user.email}</p>
                
@@ -453,7 +461,7 @@ export default function App() {
          <div className="static-page">
            <h1>About Us</h1>
            <p>Welcome to SOKOFLIX, your ultimate destination for free, high-quality streaming.</p>
-           <p>Built proudly in South Africa, SOKOFLIX is a flagship project by Victor Soko and the Soko Ecom team. We believe that discovering and enjoying premium entertainment—from the newest cinematic releases to your favorite timeless anime—should be a seamless, beautiful, and accessible experience for everyone.</p>
+           <p>Built proudly in South Africa, SOKOFLIX is a flagship project by the Soko Ecom team. We believe that discovering and enjoying premium entertainment—from the newest cinematic releases to your favorite timeless anime—should be a seamless, beautiful, and accessible experience for everyone.</p>
            <p>We are constantly evolving our platform to bring you the best interface, the fastest streams, and the most comprehensive library possible. Grab some popcorn, add some titles to your Watch Later list, and enjoy the show.</p>
          </div>
        ) :
@@ -475,7 +483,7 @@ export default function App() {
            <h2>1. Information We Collect</h2>
            <p>When you use Google Sign-In, we collect your basic profile information (name, email address, and profile picture) to create your account and manage your Watch Later library. We do not sell or share this data with third parties.</p>
            <h2>2. Cookies and Tracking</h2>
-           <p>SOKOFLIX uses local storage and basic cookies to keep you logged in and to save your UI preferences (like the Pop Ads toggle).</p>
+           <p>SOKOFLIX uses local storage and basic cookies to keep you logged in and to save your UI preferences.</p>
            <h2>3. Third-Party Links</h2>
            <p>We aggregate video content from third-party servers. We do not host any media files on our own servers. Please be aware that third-party video players may use their own tracking or advertisements.</p>
          </div>
@@ -572,13 +580,14 @@ export default function App() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <h2 style={{ fontSize: '2.5rem', margin: '0 0 8px 0', fontWeight: 'bold' }}>{getTitle(activeItem)}</h2>
                 
-                <button onClick={toggleLibrary} style={{ backgroundColor: isInLibrary ? '#22c55e' : '#1e293b', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background 0.2s' }}>
-                  {isInLibrary ? (
+                {/* Save button explicitly calls toggleLibrary with activeItem */}
+                <button onClick={() => toggleLibrary(activeItem)} style={{ backgroundColor: checkInLibrary(activeItem.id) ? '#22c55e' : '#1e293b', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background 0.2s' }}>
+                  {checkInLibrary(activeItem.id) ? (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                   ) : (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
                   )}
-                  <span className="mobile-hide" style={{ fontWeight: 'bold' }}>{isInLibrary ? 'Saved' : 'Save'}</span>
+                  <span className="mobile-hide" style={{ fontWeight: 'bold' }}>{checkInLibrary(activeItem.id) ? 'Saved' : 'Save'}</span>
                 </button>
               </div>
 
@@ -760,8 +769,9 @@ export default function App() {
                     <div className="hero-buttons" style={{ display: 'flex', gap: '15px' }}>
                       <button className="watch-now-btn" onClick={() => setActiveItem(heroItem)} style={{ backgroundColor: '#dc2626', color: '#fff', border: 'none', padding: '12px 30px', fontSize: '1.1rem', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}>Watch Now</button>
                       
-                      <button className="watchlist-btn" onClick={toggleLibrary} style={{ backgroundColor: '#1e293b', color: '#fff', border: 'none', padding: '12px 25px', fontSize: '1.1rem', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                        {isInLibrary ? (
+                      {/* NEW: Explicitly passing heroItem to toggleLibrary */}
+                      <button className="watchlist-btn" onClick={() => toggleLibrary(heroItem)} style={{ backgroundColor: '#1e293b', color: '#fff', border: 'none', padding: '12px 25px', fontSize: '1.1rem', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        {checkInLibrary(heroItem?.id) ? (
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                         ) : (
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
