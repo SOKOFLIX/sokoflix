@@ -29,7 +29,8 @@ const Icons = {
   FilterYear: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>,
   FilterRating: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>,
   FilterClear: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>,
-  FilterSort: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+  FilterSort: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>,
+  User: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
 };
 
 const currentYear = 2026;
@@ -73,7 +74,6 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch user's saved movies from Firestore
   const fetchLibrary = async (uid) => {
     try {
       const q = query(collection(db, "users", uid, "library"));
@@ -88,7 +88,6 @@ export default function App() {
     }
   };
 
-  // Check if active item is already in library
   useEffect(() => {
     if (activeItem && user) {
       const found = myLibrary.find(item => item.id === activeItem.id);
@@ -100,7 +99,7 @@ export default function App() {
 
   const handleAuth = async () => {
     if (user) {
-      await signOut(auth);
+      setCurrentTab('Account');
     } else {
       try {
         await signInWithPopup(auth, provider);
@@ -110,9 +109,14 @@ export default function App() {
     }
   };
 
+  const handleLogout = async () => {
+    await signOut(auth);
+    setCurrentTab('Home');
+  };
+
   const toggleLibrary = async () => {
     if (!user) {
-      alert("Please sign in with Google to save to your library!");
+      alert("Please sign in with Google to save to Watch Later!");
       return;
     }
     try {
@@ -144,14 +148,26 @@ export default function App() {
     setCurrentTab(tabName);
     setActiveItem(null);
     setSearchQuery('');
-    if (type) {
+    
+    if (tabName === 'Search') {
+      setIsSearchActive(true);
+    } else {
+      setIsSearchActive(false);
+    }
+
+    if (tabName === 'Anime') {
+      setMediaType('tv');
+      setFilterGenre('16'); // TMDB Animation genre
+      setFilterLang('ja');  // Japanese
+      setFilterSort('popularity.desc');
+      setFilterYear('');
+      setFilterRating('');
+    } else if (type) {
       setMediaType(type);
       resetFilters();
     }
-    if (tabName === 'Search') setIsSearchActive(true);
-    else setIsSearchActive(false);
 
-    if (tabName === 'My Library' && user) {
+    if (tabName === 'Watch Later' && user) {
       fetchLibrary(user.uid);
     }
   };
@@ -190,7 +206,7 @@ export default function App() {
   }, [mediaType, currentTab]);
 
   useEffect(() => {
-    if (currentTab === 'Movies' || currentTab === 'TV Shows') {
+    if (currentTab === 'Movies' || currentTab === 'TV Shows' || currentTab === 'Anime') {
       let url = `${BASE_URL}/discover/${mediaType}?api_key=${TMDB_API_KEY}&sort_by=${filterSort}`;
       if (filterGenre) url += `&with_genres=${filterGenre}`;
       if (filterLang) url += `&with_original_language=${filterLang}`;
@@ -297,6 +313,11 @@ export default function App() {
         .clear-filters-btn:hover { background-color: rgba(220, 38, 38, 0.1); }
 
         .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; }
+        
+        .static-page { max-width: 800px; margin: 0 auto; padding: 60px 20px; color: #cbd5e1; line-height: 1.8; }
+        .static-page h1 { color: #fff; font-size: 2.5rem; margin-bottom: 20px; }
+        .static-page h2 { color: #fff; margin-top: 30px; margin-bottom: 10px; }
+        .static-page p { margin-bottom: 20px; }
 
         @media (max-width: 900px) {
           .nav-links { display: none; }
@@ -319,7 +340,7 @@ export default function App() {
           .mob-nav-item span { transition: transform 0.2s ease; }
           .mob-nav-item.active span { transform: translateY(2px); display: inline-block; }
           
-          .carousel-container { height: 75vh !important; align-items: flex-end !important; }
+          .carousel-container { height: 85vh !important; min-height: 600px; align-items: flex-end !important; padding-bottom: 40px !important; }
           .hero-content { padding: 0 20px 30px 20px !important; text-align: left !important; width: 100%; box-sizing: border-box; }
           .carousel-btn-left { left: 15px !important; top: 35% !important; transform: translateY(-50%); }
           .carousel-btn-right { right: 15px !important; top: 35% !important; transform: translateY(-50%); }
@@ -337,7 +358,7 @@ export default function App() {
           .mobile-hide { display: none !important; }
 
           .player-container { padding: 20px 20px !important; }
-          .section-padding { padding: 0 20px !important; margin-top: 20px !important; }
+          .section-padding { padding: 0 20px !important; margin-top: 60px !important; position: relative; z-index: 10; }
           
           .browse-container { padding: 40px 15px 120px 15px !important; } 
           .footer { flex-direction: column; padding: 40px 20px; }
@@ -357,7 +378,7 @@ export default function App() {
           </div>
           
           {user ? (
-            <img src={user.photoURL} alt="Profile" className="user-avatar" onClick={handleAuth} title="Sign Out" />
+            <img src={user.photoURL} alt="Profile" className="user-avatar" onClick={handleAuth} title="My Account" />
           ) : (
             <button className="auth-btn" onClick={handleAuth}>
               Sign In
@@ -379,8 +400,7 @@ export default function App() {
           <div className={`nav-item ${currentTab === 'Movies' ? 'active' : ''}`} onClick={() => handleNavClick('Movies', 'movie')}>{Icons.Movies} Movies</div>
           <div className={`nav-item ${currentTab === 'TV Shows' ? 'active' : ''}`} onClick={() => handleNavClick('TV Shows', 'tv')}>{Icons.TV} TV Shows</div>
           <div className={`nav-item ${currentTab === 'Anime' ? 'active' : ''}`} onClick={() => handleNavClick('Anime')}>{Icons.Anime} Anime</div>
-          <div className={`nav-item ${currentTab === 'Parties' ? 'active' : ''}`} onClick={() => handleNavClick('Parties')}>{Icons.Parties} Parties</div>
-          <div className={`nav-item ${currentTab === 'My Library' ? 'active' : ''}`} onClick={() => handleNavClick('My Library')}>{Icons.Library} My Library</div>
+          <div className={`nav-item ${currentTab === 'Watch Later' ? 'active' : ''}`} onClick={() => handleNavClick('Watch Later')}>{Icons.Library} Watch Later</div>
         </div>
       </header>
 
@@ -399,12 +419,82 @@ export default function App() {
       )}
 
       {/* --- DYNAMIC MAIN CONTENT --- */}
-      {currentTab === 'Anime' ? renderPlaceholder('Anime') :
-       currentTab === 'Parties' ? renderPlaceholder('Watch Parties') :
+      {currentTab === 'Parties' ? renderPlaceholder('Watch Parties') :
        
-       currentTab === 'My Library' ? (
+       /* ACCOUNT SETTINGS VIEW */
+       currentTab === 'Account' ? (
+         <div className="static-page" style={{ textAlign: 'center' }}>
+           {user ? (
+             <>
+               <img src={user.photoURL} alt="Profile" style={{ width: '100px', height: '100px', borderRadius: '50%', border: '4px solid #ef4444', marginBottom: '20px' }} />
+               <h1>Welcome, {user.displayName}</h1>
+               <p style={{ fontSize: '1.2rem', color: '#94a3b8' }}>{user.email}</p>
+               
+               <div style={{ backgroundColor: '#1e293b', padding: '30px', borderRadius: '12px', margin: '40px 0', textAlign: 'left' }}>
+                 <h3>Account Settings</h3>
+                 <p>Notifications, playback preferences, and UI settings will be available here soon.</p>
+               </div>
+
+               <button onClick={handleLogout} style={{ backgroundColor: 'transparent', border: '1px solid #ef4444', color: '#ef4444', padding: '12px 30px', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.2s' }}>
+                 Sign Out
+               </button>
+             </>
+           ) : (
+             <>
+               <h1>Account</h1>
+               <p>Please sign in to view your account details.</p>
+             </>
+           )}
+         </div>
+       ) :
+
+       /* STATIC PAGES */
+       currentTab === 'About' ? (
+         <div className="static-page">
+           <h1>About Us</h1>
+           <p>Welcome to SOKOFLIX, your ultimate destination for free, high-quality streaming.</p>
+           <p>Built proudly in South Africa, SOKOFLIX is a flagship project by Victor Soko and the Soko Ecom team. We believe that discovering and enjoying premium entertainment—from the newest cinematic releases to your favorite timeless anime—should be a seamless, beautiful, and accessible experience for everyone.</p>
+           <p>We are constantly evolving our platform to bring you the best interface, the fastest streams, and the most comprehensive library possible. Grab some popcorn, add some titles to your Watch Later list, and enjoy the show.</p>
+         </div>
+       ) :
+       currentTab === 'Contact' ? (
+         <div className="static-page">
+           <h1>Contact Us</h1>
+           <p>Have a question, a movie request, or found a bug? We'd love to hear from you.</p>
+           <p>Email us at: <strong>support@sokoecom.com</strong></p>
+           <div style={{ marginTop: '40px', padding: '30px', backgroundColor: '#1e293b', borderRadius: '12px' }}>
+             <h3 style={{ margin: '0 0 15px 0' }}>Join the Community</h3>
+             <p style={{ margin: 0 }}>Follow Soko Ecom on our social channels for updates, new feature drops, and behind-the-scenes looks at how SOKOFLIX is built.</p>
+           </div>
+         </div>
+       ) :
+       currentTab === 'Privacy' ? (
+         <div className="static-page">
+           <h1>Privacy Policy</h1>
+           <p>Last updated: 2026</p>
+           <h2>1. Information We Collect</h2>
+           <p>When you use Google Sign-In, we collect your basic profile information (name, email address, and profile picture) to create your account and manage your Watch Later library. We do not sell or share this data with third parties.</p>
+           <h2>2. Cookies and Tracking</h2>
+           <p>SOKOFLIX uses local storage and basic cookies to keep you logged in and to save your UI preferences (like the Pop Ads toggle).</p>
+           <h2>3. Third-Party Links</h2>
+           <p>We aggregate video content from third-party servers. We do not host any media files on our own servers. Please be aware that third-party video players may use their own tracking or advertisements.</p>
+         </div>
+       ) :
+       currentTab === 'Terms' ? (
+         <div className="static-page">
+           <h1>Terms of Service</h1>
+           <p>By accessing SOKOFLIX, you agree to be bound by these Terms of Service.</p>
+           <h2>Content Disclaimer</h2>
+           <p>SOKOFLIX acts as a search engine and aggregator. All movie and TV show data is provided by the TMDB API. Video content is embedded from third-party sources. SOKOFLIX does not host, upload, or control any of the video files streamed on this platform.</p>
+           <h2>User Accounts</h2>
+           <p>You are responsible for maintaining the security of your Google account. SOKOFLIX reserves the right to terminate accounts that violate our community guidelines.</p>
+         </div>
+       ) :
+
+       /* WATCH LATER VIEW */
+       currentTab === 'Watch Later' ? (
          <div className="browse-container" style={{ padding: '40px 60px', maxWidth: '1600px', margin: '0 auto', minHeight: '60vh' }}>
-          <h2 style={{ fontSize: '2.5rem', marginBottom: '30px', fontWeight: '900' }}>My Library</h2>
+          <h2 style={{ fontSize: '2.5rem', marginBottom: '30px', fontWeight: '900' }}>Watch Later</h2>
           {!user ? (
             <div style={{ textAlign: 'center', padding: '60px', backgroundColor: '#1e293b', borderRadius: '12px' }}>
               <h3>Please Sign In</h3>
@@ -414,15 +504,35 @@ export default function App() {
           ) : myLibrary.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px', color: '#64748b' }}>
               {Icons.Library}
-              <h3 style={{ marginTop: '20px' }}>Your library is empty</h3>
+              <h3 style={{ marginTop: '20px' }}>Your list is empty</h3>
               <p>Add movies and shows by clicking the save icon on their page.</p>
             </div>
           ) : (
-            <div className="media-grid">
-              {myLibrary.map(item => (
-                <MovieCard key={item.id} item={item} onClick={() => { setMediaType(item.media_type || 'movie'); setActiveItem(item); }} mediaType={item.media_type || 'movie'} isGrid />
-              ))}
-            </div>
+            <>
+              {/* Movies Section */}
+              {myLibrary.filter(item => item.media_type === 'movie').length > 0 && (
+                <div style={{ marginBottom: '50px' }}>
+                  <h3 style={{ fontSize: '1.5rem', marginBottom: '20px', borderBottom: '1px solid #334155', paddingBottom: '10px' }}>Saved Movies</h3>
+                  <div className="media-grid">
+                    {myLibrary.filter(item => item.media_type === 'movie').map(item => (
+                      <MovieCard key={item.id} item={item} onClick={() => { setMediaType('movie'); setActiveItem(item); }} mediaType="movie" isGrid />
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* TV Series Section */}
+              {myLibrary.filter(item => item.media_type === 'tv').length > 0 && (
+                <div>
+                  <h3 style={{ fontSize: '1.5rem', marginBottom: '20px', borderBottom: '1px solid #334155', paddingBottom: '10px' }}>Saved Series & Anime</h3>
+                  <div className="media-grid">
+                    {myLibrary.filter(item => item.media_type === 'tv').map(item => (
+                      <MovieCard key={item.id} item={item} onClick={() => { setMediaType('tv'); setActiveItem(item); }} mediaType="tv" isGrid />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
          </div>
        ) :
@@ -500,7 +610,7 @@ export default function App() {
                 </button>
               )}
 
-              {/* CAST UI - FIXED WITH FLEX-SHRINK: 0 */}
+              {/* CAST UI */}
               {itemDetails?.credits?.cast && itemDetails.credits.cast.length > 0 && (
                 <div style={{ marginTop: '30px' }}>
                   <h3 style={{ fontSize: '1.1rem', marginBottom: '12px', fontWeight: 'bold' }}>Top Cast</h3>
@@ -530,9 +640,9 @@ export default function App() {
           </div>
         </div>
 
-      ) : currentTab === 'Movies' || currentTab === 'TV Shows' ? (
+      ) : currentTab === 'Movies' || currentTab === 'TV Shows' || currentTab === 'Anime' ? (
         
-        /* --- DEDICATED BROWSE VIEW --- */
+        /* --- DEDICATED BROWSE VIEW (Movies, TV, and Anime) --- */
         <div className="browse-container" style={{ padding: '40px 60px', maxWidth: '1600px', margin: '0 auto' }}>
           <h2 style={{ fontSize: '2.5rem', marginBottom: '20px', fontWeight: '900' }}>Browse {currentTab}</h2>
           
@@ -649,12 +759,22 @@ export default function App() {
                     <p className="hero-desc" style={{ fontSize: '1.1rem', color: '#e2e8f0', lineHeight: '1.5', marginBottom: '30px', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>{heroItem.overview}</p>
                     <div className="hero-buttons" style={{ display: 'flex', gap: '15px' }}>
                       <button className="watch-now-btn" onClick={() => setActiveItem(heroItem)} style={{ backgroundColor: '#dc2626', color: '#fff', border: 'none', padding: '12px 30px', fontSize: '1.1rem', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}>Watch Now</button>
+                      
+                      <button className="watchlist-btn" onClick={toggleLibrary} style={{ backgroundColor: '#1e293b', color: '#fff', border: 'none', padding: '12px 25px', fontSize: '1.1rem', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        {isInLibrary ? (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        ) : (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                        )}
+                        <span className="watchlist-text">Watchlist</span>
+                      </button>
+
                     </div>
                   </div>
                 </div>
               )}
 
-              <div className="section-padding" style={{ padding: '0 40px', marginTop: '-40px', position: 'relative', zIndex: 10 }}>
+              <div className="section-padding">
                 <MovieRow title="Trending Today" items={trendingDay} onClickItem={setActiveItem} mediaType={mediaType} isLive />
                 <MovieRow title="Trending This Week" items={trendingWeek} onClickItem={setActiveItem} mediaType={mediaType} />
                 <MovieRow title={mediaType === 'movie' ? "Newest in Theaters" : "On The Air"} items={newest} onClickItem={setActiveItem} mediaType={mediaType} />
@@ -676,16 +796,15 @@ export default function App() {
           <span className="footer-link" onClick={() => handleNavClick('Movies', 'movie')}>Movies</span>
           <span className="footer-link" onClick={() => handleNavClick('TV Shows', 'tv')}>TV Shows</span>
           <span className="footer-link" onClick={() => handleNavClick('Anime')}>Anime</span>
-          <span className="footer-link" onClick={() => handleNavClick('My Library')}>My Library</span>
-          <span className="footer-link" onClick={() => handleNavClick('Search')}>Search</span>
+          <span className="footer-link" onClick={() => handleNavClick('Watch Later')}>Watch Later</span>
         </div>
 
         <div className="footer-col">
           <span className="footer-heading">Information</span>
-          <span className="footer-link">Privacy Policy</span>
-          <span className="footer-link">Terms of Service</span>
-          <span className="footer-link">Contact Us</span>
-          <span className="footer-link">About</span>
+          <span className="footer-link" onClick={() => handleNavClick('Privacy')}>Privacy Policy</span>
+          <span className="footer-link" onClick={() => handleNavClick('Terms')}>Terms of Service</span>
+          <span className="footer-link" onClick={() => handleNavClick('Contact')}>Contact Us</span>
+          <span className="footer-link" onClick={() => handleNavClick('About')}>About SOKOFLIX</span>
         </div>
       </footer>
 
@@ -703,8 +822,8 @@ export default function App() {
         <div className={`mob-nav-item ${currentTab === 'Anime' ? 'active' : ''}`} onClick={() => handleNavClick('Anime')}>
           {Icons.Anime} <span>Anime</span>
         </div>
-        <div className={`mob-nav-item ${currentTab === 'My Library' ? 'active' : ''}`} onClick={() => handleNavClick('My Library')}>
-          {Icons.Library} <span>Library</span>
+        <div className={`mob-nav-item ${currentTab === 'Watch Later' ? 'active' : ''}`} onClick={() => handleNavClick('Watch Later')}>
+          {Icons.Library} <span>Later</span>
         </div>
         <div className={`mob-nav-item ${currentTab === 'Search' ? 'active' : ''}`} onClick={() => handleNavClick('Search')}>
           {Icons.Search} <span>Search</span>
