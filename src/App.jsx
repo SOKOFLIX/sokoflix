@@ -207,73 +207,37 @@ export default function App() {
         .clear-filters-btn { display: flex; align-items: center; gap: 8px; background: none; border: 1px solid #dc2626; color: #ef4444; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.9rem; transition: background 0.2s; }
         .clear-filters-btn:hover { background-color: rgba(220, 38, 38, 0.1); }
 
+        /* --- SMART GRID SYSTEM --- */
+        .media-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+          gap: 20px;
+        }
+
         @media (max-width: 900px) {
           .nav-links { display: none; }
           .header-left { gap: 15px; }
           .header-nav { padding: 15px 20px; }
           .search-bar-container { width: 100%; padding: 0 20px; margin-top: 10px; }
           
-          /* --- THE UPDATED MOBILE NAV --- */
+          /* --- TWO COLUMN MOBILE GRID --- */
+          .media-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+          }
+          
           .mobile-bottom-nav { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            position: fixed; 
-            bottom: 25px; 
-            left: 50%; 
-            transform: translateX(-50%); 
-            width: calc(100% - 40px); 
-            max-width: 450px; 
-            background-color: rgba(15, 23, 42, 0.95); 
-            backdrop-filter: blur(20px); 
-            padding: 8px 6px; 
-            border-radius: 40px; 
-            z-index: 1000; 
-            box-shadow: 0 20px 40px rgba(0,0,0,0.8); 
-            border: 1px solid rgba(255,255,255,0.05); 
-            box-sizing: border-box; 
+            display: flex; justify-content: space-between; align-items: center; position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); width: calc(100% - 40px); max-width: 450px; background-color: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px); padding: 8px 6px; border-radius: 40px; z-index: 1000; box-shadow: 0 20px 40px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.05); box-sizing: border-box; 
           }
-          
           .mob-nav-item { 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            gap: 5px; 
-            color: #64748b; 
-            font-size: 0.75rem; 
-            font-weight: 700; 
-            cursor: pointer; 
-            position: relative; 
-            padding: 12px 0 10px 0; 
-            border-radius: 30px; 
-            transition: all 0.3s ease; 
-            flex: 1; 
-            -webkit-tap-highlight-color: transparent; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; color: #64748b; font-size: 0.75rem; font-weight: 700; cursor: pointer; position: relative; padding: 12px 0 10px 0; border-radius: 30px; transition: all 0.3s ease; flex: 1; -webkit-tap-highlight-color: transparent; 
           }
-          
-          .mob-nav-item.active { 
-            color: #93c5fd; 
-            background-color: #1e3a8a; 
-          }
-          
-          .mob-nav-item.active::before { 
-            content: ''; 
-            position: absolute; 
-            top: 6px; 
-            left: 50%; 
-            transform: translateX(-50%); 
-            width: 4px; 
-            height: 4px; 
-            background-color: #93c5fd; 
-            border-radius: 50%; 
-          }
-          
+          .mob-nav-item.active { color: #93c5fd; background-color: #1e3a8a; }
+          .mob-nav-item.active::before { content: ''; position: absolute; top: 6px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; background-color: #93c5fd; border-radius: 50%; }
           .mob-nav-item svg { width: 22px; height: 22px; transition: transform 0.2s ease; }
           .mob-nav-item.active svg { transform: translateY(2px); }
           .mob-nav-item span { transition: transform 0.2s ease; }
           .mob-nav-item.active span { transform: translateY(2px); display: inline-block; }
-          /* ------------------------------ */
           
           .carousel-container { height: 75vh !important; align-items: flex-end !important; }
           .hero-content { padding: 0 20px 30px 20px !important; text-align: left !important; width: 100%; box-sizing: border-box; }
@@ -292,7 +256,7 @@ export default function App() {
           .player-meta img { width: 120px !important; }
           .mobile-hide { display: none !important; }
           .section-padding { padding: 0 20px !important; }
-          .browse-container { padding: 40px 20px !important; }
+          .browse-container { padding: 40px 15px 120px 15px !important; } /* Added extra bottom padding to clear the nav menu */
           .footer { flex-direction: column; padding: 40px 20px; }
 
           .browse-filter-bar { gap: 10px; }
@@ -470,7 +434,6 @@ export default function App() {
               </select>
             </div>
 
-            {/* Replaced "Smart Filter" with a "Clear Filters" action button */}
             {(filterGenre || filterLang || filterYear || filterRating || filterSort !== 'popularity.desc') && (
               <button className="clear-filters-btn" onClick={resetFilters}>
                 {Icons.FilterClear} Clear
@@ -489,9 +452,9 @@ export default function App() {
 
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '20px' }}>
+          <div className="media-grid">
             {browseItems.length > 0 ? browseItems.filter(i => i.poster_path).map(item => (
-              <MovieCard key={item.id} item={item} onClick={() => setActiveItem(item)} mediaType={mediaType} />
+              <MovieCard key={item.id} item={item} onClick={() => setActiveItem(item)} mediaType={mediaType} isGrid />
             )) : (
               <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: '#64748b' }}>
                 <h3>No results found matching your filters.</h3>
@@ -506,8 +469,8 @@ export default function App() {
           {searchQuery.length > 2 ? (
             <div className="section-padding" style={{ padding: '40px' }}>
               <h2 style={{ fontSize: '2rem', marginBottom: '30px' }}>Search Results</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '15px' }}>
-                {searchResults.map(item => <MovieCard key={item.id} item={item} onClick={() => setActiveItem(item)} mediaType={mediaType} />)}
+              <div className="media-grid">
+                {searchResults.map(item => <MovieCard key={item.id} item={item} onClick={() => setActiveItem(item)} mediaType={mediaType} isGrid />)}
               </div>
             </div>
           ) : (
@@ -626,11 +589,12 @@ function MovieRow({ title, items, onClickItem, mediaType, isLive }) {
   );
 }
 
-function MovieCard({ item, onClick, mediaType }) {
+// Added the `isGrid` prop so it knows when to stretch and when to stay fixed!
+function MovieCard({ item, onClick, mediaType, isGrid }) {
   const ratingScore = Math.round(item.vote_average * 10);
   return (
-    <div className="movie-card" onClick={onClick} style={{ minWidth: '160px', width: '160px', position: 'relative', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer', backgroundColor: '#1e293b' }}>
-      <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={getTitle(item)} style={{ width: '100%', height: '240px', objectFit: 'cover', display: 'block' }} />
+    <div className="movie-card" onClick={onClick} style={{ minWidth: isGrid ? '0' : '160px', width: isGrid ? '100%' : '160px', position: 'relative', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer', backgroundColor: '#1e293b' }}>
+      <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={getTitle(item)} style={{ width: '100%', height: isGrid ? 'auto' : '240px', aspectRatio: isGrid ? '2/3' : 'auto', objectFit: 'cover', display: 'block' }} />
       <div className="mobile-hide" style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '60%', background: 'linear-gradient(0deg, rgba(0,0,0,0.95) 0%, transparent 100%)' }}></div>
       <div style={{ position: 'absolute', top: '8px', left: '8px', backgroundColor: '#3b82f6', color: '#fff', padding: '3px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '900' }}>✦ NEW</div>
       <div style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: getRatingColor(item.vote_average), color: '#fff', padding: '3px 6px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '900' }}>★ {ratingScore}%</div>
