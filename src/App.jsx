@@ -207,12 +207,7 @@ export default function App() {
         .clear-filters-btn { display: flex; align-items: center; gap: 8px; background: none; border: 1px solid #dc2626; color: #ef4444; padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.9rem; transition: background 0.2s; }
         .clear-filters-btn:hover { background-color: rgba(220, 38, 38, 0.1); }
 
-        /* --- SMART GRID SYSTEM --- */
-        .media-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-          gap: 20px;
-        }
+        .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; }
 
         @media (max-width: 900px) {
           .nav-links { display: none; }
@@ -220,11 +215,7 @@ export default function App() {
           .header-nav { padding: 15px 20px; }
           .search-bar-container { width: 100%; padding: 0 20px; margin-top: 10px; }
           
-          /* --- TWO COLUMN MOBILE GRID --- */
-          .media-grid {
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-          }
+          .media-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
           
           .mobile-bottom-nav { 
             display: flex; justify-content: space-between; align-items: center; position: fixed; bottom: 25px; left: 50%; transform: translateX(-50%); width: calc(100% - 40px); max-width: 450px; background-color: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px); padding: 8px 6px; border-radius: 40px; z-index: 1000; box-shadow: 0 20px 40px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.05); box-sizing: border-box; 
@@ -255,8 +246,11 @@ export default function App() {
           .player-meta { flex-direction: column !important; align-items: flex-start !important; gap: 20px !important; }
           .player-meta img { width: 120px !important; }
           .mobile-hide { display: none !important; }
-          .section-padding { padding: 0 20px !important; }
-          .browse-container { padding: 40px 15px 120px 15px !important; } /* Added extra bottom padding to clear the nav menu */
+
+          /* FIX: Overriding the negative margin to prevent overlapping on mobile */
+          .section-padding { padding: 0 20px !important; margin-top: 20px !important; }
+          
+          .browse-container { padding: 40px 15px 120px 15px !important; } 
           .footer { flex-direction: column; padding: 40px 20px; }
 
           .browse-filter-bar { gap: 10px; }
@@ -589,7 +583,6 @@ function MovieRow({ title, items, onClickItem, mediaType, isLive }) {
   );
 }
 
-// Added the `isGrid` prop so it knows when to stretch and when to stay fixed!
 function MovieCard({ item, onClick, mediaType, isGrid }) {
   const ratingScore = Math.round(item.vote_average * 10);
   return (
