@@ -166,10 +166,13 @@ export default function App() {
   );
 
   return (
-    {/* ADDED: overflowX: 'hidden' to the main root div to prevent page sliding */}
     <div style={{ backgroundColor: '#060913', color: '#fff', minHeight: '100vh', fontFamily: 'Helvetica, Arial, sans-serif', paddingBottom: '100px', overflowX: 'hidden' }}>
       
       <style>{`
+        /* FIX: Global reset to completely kill horizontal scrolling */
+        * { box-sizing: border-box; }
+        html, body { overflow-x: hidden; max-width: 100vw; margin: 0; padding: 0; background-color: #060913; }
+
         .hide-scroll::-webkit-scrollbar { display: none; }
         .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
         .movie-card { transition: transform 0.3s ease, box-shadow 0.3s ease; }
@@ -248,7 +251,6 @@ export default function App() {
           .player-meta img { width: 120px !important; }
           .mobile-hide { display: none !important; }
 
-          /* FIX: Updated padding from 40px to 20px so the mobile player screen fits properly */
           .player-container { padding: 20px 20px !important; }
           .section-padding { padding: 0 20px !important; margin-top: 20px !important; }
           
@@ -317,7 +319,7 @@ export default function App() {
        activeItem ? (
         
         /* --- PLAYER VIEW --- */
-        <div className="player-container" style={{ paddingTop: '40px', width: '100%', maxWidth: '1400px', margin: '0 auto', boxSizing: 'border-box', padding: '40px 40px 40px 40px' }}>
+        <div className="player-container" style={{ paddingTop: '40px', width: '100%', maxWidth: '1400px', margin: '0 auto', padding: '40px 40px 40px 40px' }}>
           <button onClick={() => setActiveItem(null)} style={{ padding: '10px 20px', marginBottom: '20px', cursor: 'pointer', backgroundColor: '#1e293b', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>← Back</button>
           
           <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', backgroundColor: '#000', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.8)' }}>
@@ -344,7 +346,6 @@ export default function App() {
 
           <div className="player-meta" style={{ marginTop: '40px', display: 'flex', gap: '30px', alignItems: 'flex-start' }}>
             <img src={`https://image.tmdb.org/t/p/w300${activeItem.poster_path}`} alt="poster" style={{ borderRadius: '8px', width: '220px', border: '1px solid #1e293b', boxShadow: '0 4px 15px rgba(0,0,0,0.5)' }} />
-            {/* FIX: Added minWidth: 0 and width: 100% so the cast scroll doesn't push boundaries */}
             <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
               <h2 style={{ fontSize: '2.5rem', margin: '0 0 8px 0', fontWeight: 'bold' }}>{getTitle(activeItem)}</h2>
               
@@ -376,22 +377,21 @@ export default function App() {
                 </button>
               )}
 
-              {/* CAST UI */}
+              {/* CAST UI - FIXED WITH FLEX-SHRINK: 0 */}
               {itemDetails?.credits?.cast && itemDetails.credits.cast.length > 0 && (
                 <div style={{ marginTop: '30px' }}>
                   <h3 style={{ fontSize: '1.1rem', marginBottom: '12px', fontWeight: 'bold' }}>Top Cast</h3>
-                  {/* Added width: 100% to ensure it obeys the parent's size */}
                   <div className="hide-scroll" style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px', width: '100%' }}>
                     {itemDetails.credits.cast.slice(0, 8).map(actor => (
-                      <div key={actor.id} style={{ minWidth: '90px', width: '90px', textAlign: 'center' }}>
+                      <div key={actor.id} style={{ minWidth: '90px', width: '90px', textAlign: 'center', flexShrink: 0 }}>
                         {actor.profile_path ? (
                           <img 
                             src={`https://image.tmdb.org/t/p/w185${actor.profile_path}`} 
                             alt={actor.name} 
-                            style={{ width: '75px', height: '75px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #334155', margin: '0 auto 8px auto', display: 'block' }} 
+                            style={{ width: '75px', height: '75px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #334155', margin: '0 auto 8px auto', display: 'block', flexShrink: 0 }} 
                           />
                         ) : (
-                          <div style={{ width: '75px', height: '75px', borderRadius: '50%', backgroundColor: '#1e293b', border: '2px solid #334155', margin: '0 auto 8px auto', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+                          <div style={{ width: '75px', height: '75px', borderRadius: '50%', backgroundColor: '#1e293b', border: '2px solid #334155', margin: '0 auto 8px auto', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', flexShrink: 0 }}>
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
                           </div>
                         )}
