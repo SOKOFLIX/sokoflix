@@ -1,4 +1,8 @@
 import { useState, useEffect } from 'react';
+// NEW: Import Firebase tools
+import { auth, provider, db } from './firebase';
+import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { collection, addDoc, getDocs, query, where, deleteDoc, doc } from 'firebase/firestore';
 
 const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 const BASE_URL = 'https://api.themoviedb.org/3';
@@ -55,6 +59,88 @@ export default function App() {
   const [filterRating, setFilterRating] = useState('');
   const [filterSort, setFilterSort] = useState('popularity.desc');
 
+  // NEW: Firebase Auth & Library State
+  const [user, setUser] = useState(null);
+  const [myLibrary, setMyLibrary] = useState([]);
+  const [isInLibrary, setIsInLibrary] = useState(false);
+
+  // Monitor User Login Status
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) fetchLibrary(currentUser.uid);
+      else setMyLibrary([]);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Fetch user's saved movies from Firestore
+  const fetchLibrary = async (uid) => {
+    try {
+      const q = query(collection(db, "users", uid, "library"));
+      const querySnapshot = await getDocs(q);
+      const items = [];
+      querySnapshot.forEach((doc) => {
+        items.push({ ...doc.data(), docId: doc.id });
+      });
+      setMyLibrary(items);
+    } catch (error) {
+      console.error("Error fetching library:", error);
+    }
+  };
+
+  // Check if active item is already in library
+  useEffect(() => {
+    if (activeItem && user) {
+      const found = myLibrary.find(item => item.id === activeItem.id);
+      setIsInLibrary(!!found);
+    } else {
+      setIsInLibrary(false);
+    }
+  }, [activeItem, myLibrary, user]);
+
+  const handleAuth = async () => {
+    if (user) {
+      await signOut(auth);
+    } else {
+      try {
+        await signInWithPopup(auth, provider);
+      } catch (error) {
+        console.error("Google Sign In Error:", error);
+      }
+    }
+  };
+
+  const toggleLibrary = async () => {
+    if (!user) {
+      alert("Please sign in with Google to save to your library!");
+      return;
+    }
+
+    try {
+      if (isInLibrary) {
+        // Remove from library
+        const itemToRemove = myLibrary.find(item => item.id === activeItem.id);
+        await deleteDoc(doc(db, "users", user.uid, "library", itemToRemove.docId));
+      } else {
+        // Add to library
+        const itemData = {
+          id: activeItem.id,
+          title: getTitle(activeItem),
+          poster_path: activeItem.poster_path,
+          vote_average: activeItem.vote_average,
+          release_date: activeItem.release_date || activeItem.first_air_date,
+          media_type: mediaType
+        };
+        await addDoc(collection(db, "users", user.uid, "library"), itemData);
+      }
+      // Refresh library list
+      fetchLibrary(user.uid);
+    } catch (error) {
+      console.error("Error updating library:", error);
+    }
+  };
+
   const resetFilters = () => {
     setFilterGenre(''); setFilterLang(''); setFilterYear(''); setFilterRating(''); setFilterSort('popularity.desc');
   };
@@ -69,6 +155,10 @@ export default function App() {
     }
     if (tabName === 'Search') setIsSearchActive(true);
     else setIsSearchActive(false);
+
+    if (tabName === 'My Library' && user) {
+      fetchLibrary(user.uid);
+    }
   };
 
   useEffect(() => {
@@ -169,7 +259,6 @@ export default function App() {
     <div style={{ backgroundColor: '#060913', color: '#fff', minHeight: '100vh', fontFamily: 'Helvetica, Arial, sans-serif', paddingBottom: '100px', overflowX: 'hidden' }}>
       
       <style>{`
-        /* FIX: Global reset to completely kill horizontal scrolling */
         * { box-sizing: border-box; }
         html, body { overflow-x: hidden; max-width: 100vw; margin: 0; padding: 0; background-color: #060913; }
 
@@ -189,9 +278,11 @@ export default function App() {
         
         .header-left { display: flex; align-items: center; gap: 30px; }
         .search-btn { display: flex; align-items: center; justify-content: center; width: 45px; height: 45px; background-color: #1e293b; border-radius: 12px; cursor: pointer; color: #fff; }
-        .pop-ads { display: flex; align-items: center; gap: 10px; color: #cbd5e1; font-size: 0.9rem; font-weight: bold; }
-        .toggle-switch { width: 44px; height: 24px; background-color: #dc2626; border-radius: 12px; position: relative; display: flex; align-items: center; padding: 2px; box-sizing: border-box; }
-        .toggle-circle { width: 20px; height: 20px; background-color: #fff; border-radius: 50%; }
+        
+        /* NEW: Login Button Styling */
+        .auth-btn { display: flex; align-items: center; gap: 8px; background-color: #2563eb; color: #fff; border: none; padding: 8px 16px; border-radius: 20px; font-weight: bold; cursor: pointer; transition: background 0.2s; font-size: 0.9rem; }
+        .auth-btn:hover { background-color: #1d4ed8; }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; border: 2px solid #3b82f6; cursor: pointer; object-fit: cover; }
 
         .mobile-bottom-nav { display: none; }
         .footer { background-color: #03050a; padding: 60px 40px 40px; border-top: 1px solid #1e293b; margin-top: 60px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 40px; }
@@ -270,13 +361,15 @@ export default function App() {
           <div className="search-btn" onClick={() => { setIsSearchActive(!isSearchActive); setCurrentTab('Search'); }}>
             {Icons.Search}
           </div>
-          <div className="pop-ads">
-            <span>Pop Ads</span>
-            <div className="toggle-switch">
-              <div className="toggle-circle"></div>
-              <span style={{ fontSize: '0.65rem', color: '#fff', position: 'absolute', right: '4px' }}>ON</span>
-            </div>
-          </div>
+          
+          {/* NEW: Auth Button replaces Pop Ads purely for utility space */}
+          {user ? (
+            <img src={user.photoURL} alt="Profile" className="user-avatar" onClick={handleAuth} title="Sign Out" />
+          ) : (
+            <button className="auth-btn" onClick={handleAuth}>
+              Sign In
+            </button>
+          )}
         </div>
 
         <div onClick={() => handleNavClick('Home', 'movie')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer' }}>
@@ -315,7 +408,33 @@ export default function App() {
       {/* --- DYNAMIC MAIN CONTENT --- */}
       {currentTab === 'Anime' ? renderPlaceholder('Anime') :
        currentTab === 'Parties' ? renderPlaceholder('Watch Parties') :
-       currentTab === 'My Library' ? renderPlaceholder('My Library') :
+       
+       /* NEW: LIBRARY VIEW */
+       currentTab === 'My Library' ? (
+         <div className="browse-container" style={{ padding: '40px 60px', maxWidth: '1600px', margin: '0 auto', minHeight: '60vh' }}>
+          <h2 style={{ fontSize: '2.5rem', marginBottom: '30px', fontWeight: '900' }}>My Library</h2>
+          {!user ? (
+            <div style={{ textAlign: 'center', padding: '60px', backgroundColor: '#1e293b', borderRadius: '12px' }}>
+              <h3>Please Sign In</h3>
+              <p style={{ color: '#94a3b8', marginBottom: '20px' }}>You need to connect your Google account to save your favorite movies and shows.</p>
+              <button className="auth-btn" style={{ margin: '0 auto' }} onClick={handleAuth}>Sign In with Google</button>
+            </div>
+          ) : myLibrary.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px', color: '#64748b' }}>
+              {Icons.Library}
+              <h3 style={{ marginTop: '20px' }}>Your library is empty</h3>
+              <p>Add movies and shows by clicking the bookmark icon on their page.</p>
+            </div>
+          ) : (
+            <div className="media-grid">
+              {myLibrary.map(item => (
+                <MovieCard key={item.id} item={item} onClick={() => { setMediaType(item.media_type || 'movie'); setActiveItem(item); }} mediaType={item.media_type || 'movie'} isGrid />
+              ))}
+            </div>
+          )}
+         </div>
+       ) :
+       
        activeItem ? (
         
         /* --- PLAYER VIEW --- */
@@ -347,8 +466,21 @@ export default function App() {
           <div className="player-meta" style={{ marginTop: '40px', display: 'flex', gap: '30px', alignItems: 'flex-start' }}>
             <img src={`https://image.tmdb.org/t/p/w300${activeItem.poster_path}`} alt="poster" style={{ borderRadius: '8px', width: '220px', border: '1px solid #1e293b', boxShadow: '0 4px 15px rgba(0,0,0,0.5)' }} />
             <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
-              <h2 style={{ fontSize: '2.5rem', margin: '0 0 8px 0', fontWeight: 'bold' }}>{getTitle(activeItem)}</h2>
               
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <h2 style={{ fontSize: '2.5rem', margin: '0 0 8px 0', fontWeight: 'bold' }}>{getTitle(activeItem)}</h2>
+                
+                {/* NEW: Interactive Watchlist Button */}
+                <button onClick={toggleLibrary} style={{ backgroundColor: isInLibrary ? '#22c55e' : '#1e293b', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background 0.2s' }}>
+                  {isInLibrary ? (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  ) : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                  )}
+                  <span className="mobile-hide" style={{ fontWeight: 'bold' }}>{isInLibrary ? 'Saved' : 'Save'}</span>
+                </button>
+              </div>
+
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#cbd5e1', fontSize: '1rem', marginBottom: '10px' }}>
                 <span>{getYear(activeItem)}</span>
                 {itemDetails?.runtime > 0 && <><span>•</span><span>{Math.floor(itemDetails.runtime / 60)}h {itemDetails.runtime % 60}m</span></>}
@@ -377,7 +509,7 @@ export default function App() {
                 </button>
               )}
 
-              {/* CAST UI - FIXED WITH FLEX-SHRINK: 0 */}
+              {/* CAST UI */}
               {itemDetails?.credits?.cast && itemDetails.credits.cast.length > 0 && (
                 <div style={{ marginTop: '30px' }}>
                   <h3 style={{ fontSize: '1.1rem', marginBottom: '12px', fontWeight: 'bold' }}>Top Cast</h3>
@@ -526,10 +658,6 @@ export default function App() {
                     <p className="hero-desc" style={{ fontSize: '1.1rem', color: '#e2e8f0', lineHeight: '1.5', marginBottom: '30px', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>{heroItem.overview}</p>
                     <div className="hero-buttons" style={{ display: 'flex', gap: '15px' }}>
                       <button className="watch-now-btn" onClick={() => setActiveItem(heroItem)} style={{ backgroundColor: '#dc2626', color: '#fff', border: 'none', padding: '12px 30px', fontSize: '1.1rem', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}>Watch Now</button>
-                      <button className="watchlist-btn" style={{ backgroundColor: '#1e293b', color: '#fff', border: 'none', padding: '12px 25px', fontSize: '1.1rem', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
-                        <span className="watchlist-text">Add to Watchlist</span>
-                      </button>
                     </div>
                   </div>
                 </div>
