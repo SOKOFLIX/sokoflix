@@ -74,7 +74,6 @@ export default function App() {
   useEffect(() => {
     setSeason(1); setEpisode(1); setItemDetails(null); setIsOverviewExpanded(false);
     if (activeItem) {
-      // UPDATED: Added &append_to_response=credits to get the cast info in the same request!
       fetch(`${BASE_URL}/${mediaType}/${activeItem.id}?api_key=${TMDB_API_KEY}&append_to_response=credits`)
         .then(res => res.json()).then(data => setItemDetails(data));
     }
@@ -167,7 +166,8 @@ export default function App() {
   );
 
   return (
-    <div style={{ backgroundColor: '#060913', color: '#fff', minHeight: '100vh', fontFamily: 'Helvetica, Arial, sans-serif', paddingBottom: '100px' }}>
+    {/* ADDED: overflowX: 'hidden' to the main root div to prevent page sliding */}
+    <div style={{ backgroundColor: '#060913', color: '#fff', minHeight: '100vh', fontFamily: 'Helvetica, Arial, sans-serif', paddingBottom: '100px', overflowX: 'hidden' }}>
       
       <style>{`
         .hide-scroll::-webkit-scrollbar { display: none; }
@@ -248,6 +248,8 @@ export default function App() {
           .player-meta img { width: 120px !important; }
           .mobile-hide { display: none !important; }
 
+          /* FIX: Updated padding from 40px to 20px so the mobile player screen fits properly */
+          .player-container { padding: 20px 20px !important; }
           .section-padding { padding: 0 20px !important; margin-top: 20px !important; }
           
           .browse-container { padding: 40px 15px 120px 15px !important; } 
@@ -342,7 +344,8 @@ export default function App() {
 
           <div className="player-meta" style={{ marginTop: '40px', display: 'flex', gap: '30px', alignItems: 'flex-start' }}>
             <img src={`https://image.tmdb.org/t/p/w300${activeItem.poster_path}`} alt="poster" style={{ borderRadius: '8px', width: '220px', border: '1px solid #1e293b', boxShadow: '0 4px 15px rgba(0,0,0,0.5)' }} />
-            <div style={{ flex: 1 }}>
+            {/* FIX: Added minWidth: 0 and width: 100% so the cast scroll doesn't push boundaries */}
+            <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
               <h2 style={{ fontSize: '2.5rem', margin: '0 0 8px 0', fontWeight: 'bold' }}>{getTitle(activeItem)}</h2>
               
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#cbd5e1', fontSize: '1rem', marginBottom: '10px' }}>
@@ -373,11 +376,12 @@ export default function App() {
                 </button>
               )}
 
-              {/* NEW: CAST UI */}
+              {/* CAST UI */}
               {itemDetails?.credits?.cast && itemDetails.credits.cast.length > 0 && (
                 <div style={{ marginTop: '30px' }}>
                   <h3 style={{ fontSize: '1.1rem', marginBottom: '12px', fontWeight: 'bold' }}>Top Cast</h3>
-                  <div className="hide-scroll" style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px' }}>
+                  {/* Added width: 100% to ensure it obeys the parent's size */}
+                  <div className="hide-scroll" style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px', width: '100%' }}>
                     {itemDetails.credits.cast.slice(0, 8).map(actor => (
                       <div key={actor.id} style={{ minWidth: '90px', width: '90px', textAlign: 'center' }}>
                         {actor.profile_path ? (
