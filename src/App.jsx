@@ -6,14 +6,18 @@ import { collection, addDoc, getDocs, query, deleteDoc, doc, setDoc, getDoc, upd
 const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 const BASE_URL = 'https://api.themoviedb.org/3';
 
-const getTitle = (item) => item?.title || item?.name;
-const getDate = (item) => item?.release_date || item?.first_air_date;
-const getYear = (item) => getDate(item)?.substring(0, 4) || 'N/A';
-const getRatingColor = (rating) => {
+// --- HOISTED HELPER FUNCTIONS ---
+function getTitle(item) { return item?.title || item?.name; }
+function getDate(item) { return item?.release_date || item?.first_air_date; }
+function getYear(item) { return getDate(item)?.substring(0, 4) || 'N/A'; }
+function getRatingColor(rating) {
   if (rating >= 7.5) return '#22c55e';
   if (rating >= 6.0) return '#f97316';
   return '#ef4444';
-};
+}
+
+const currentYear = 2026;
+const YEARS = Array.from(new Array(40), (val, index) => currentYear - index);
 
 // --- SVG ICONS ---
 const Icons = {
@@ -32,9 +36,43 @@ const Icons = {
   FilterSort: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
 };
 
-const currentYear = 2026;
-const YEARS = Array.from(new Array(40), (val, index) => currentYear - index);
+// --- COMPONENTS MOVED TO THE TOP TO PREVENT VITE CRASH ---
+function MovieCard({ item, onClick, mediaType, isGrid }) {
+  const ratingScore = Math.round(item.vote_average * 10);
+  return (
+    <div className="movie-card" onClick={onClick} style={{ minWidth: isGrid ? '0' : '160px', width: isGrid ? '100%' : '160px', position: 'relative', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer', backgroundColor: '#1e293b' }}>
+      <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={getTitle(item)} style={{ width: '100%', height: isGrid ? 'auto' : '240px', aspectRatio: isGrid ? '2/3' : 'auto', objectFit: 'cover', display: 'block' }} />
+      <div className="mobile-hide" style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '60%', background: 'linear-gradient(0deg, rgba(0,0,0,0.95) 0%, transparent 100%)' }}></div>
+      <div style={{ position: 'absolute', top: '8px', left: '8px', backgroundColor: '#3b82f6', color: '#fff', padding: '3px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '900' }}>✦ NEW</div>
+      <div style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: getRatingColor(item.vote_average), color: '#fff', padding: '3px 6px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '900' }}>★ {ratingScore}%</div>
+      <div className="mobile-hide" style={{ position: 'absolute', bottom: '12px', left: '12px', right: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '6px', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 'bold' }}>
+          <span>{getYear(item)}</span>
+          <span style={{ textTransform: 'capitalize' }}>{mediaType}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
+function MovieRow({ title, items, onClickItem, mediaType, isLive }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div style={{ marginBottom: '40px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px' }}>
+        <h3 style={{ fontSize: '1.5rem', margin: 0 }}>{title}</h3>
+        {isLive && <span style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', border: '1px solid #ef4444' }}>Live</span>}
+      </div>
+      <div className="hide-scroll" style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '15px' }}>
+        {items.filter(i => i.poster_path).map(item => (
+          <MovieCard key={item.id} item={item} onClick={() => onClickItem(item)} mediaType={mediaType} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// --- MAIN APP ---
 export default function App() {
   const [trendingDay, setTrendingDay] = useState([]);
   const [trendingWeek, setTrendingWeek] = useState([]);
@@ -58,7 +96,6 @@ export default function App() {
   const [filterRating, setFilterRating] = useState('');
   const [filterSort, setFilterSort] = useState('popularity.desc');
 
-  // Firebase Auth, Library & Recommendations State
   const [user, setUser] = useState(null);
   const [myLibrary, setMyLibrary] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
@@ -68,7 +105,6 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   
-  // PARTY SYSTEM STATES
   const [partyCode, setPartyCode] = useState('');
   const [generatedPartyCode, setGeneratedPartyCode] = useState(null);
   const [currentPartyCode, setCurrentPartyCode] = useState(null);
@@ -77,22 +113,21 @@ export default function App() {
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
 
-  // 1. DEFINE fetchLibrary FIRST (Fixes the TDZ crash!)
-  const fetchLibrary = async (uid) => {
+  function fetchLibrary(uid) {
     try {
       const q = query(collection(db, "users", uid, "library"));
-      const querySnapshot = await getDocs(q);
-      const items = [];
-      querySnapshot.forEach((doc) => {
-        items.push({ ...doc.data(), docId: doc.id });
+      getDocs(q).then((querySnapshot) => {
+        const items = [];
+        querySnapshot.forEach((doc) => {
+          items.push({ ...doc.data(), docId: doc.id });
+        });
+        setMyLibrary(items);
       });
-      setMyLibrary(items);
     } catch (error) {
       console.error("Error fetching library:", error);
     }
-  };
+  }
 
-  // 2. CALL IT SECOND
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -102,36 +137,36 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  const handleEmailAuth = async (e) => {
+  function handleEmailAuth(e) {
     e.preventDefault();
     try {
       if (isSignUp) {
-        await createUserWithEmailAndPassword(auth, authEmail, authPassword);
+        createUserWithEmailAndPassword(auth, authEmail, authPassword).then(() => {
+          setShowAuthModal(false); setAuthEmail(''); setAuthPassword('');
+        }).catch(err => alert(err.message));
       } else {
-        await signInWithEmailAndPassword(auth, authEmail, authPassword);
+        signInWithEmailAndPassword(auth, authEmail, authPassword).then(() => {
+          setShowAuthModal(false); setAuthEmail(''); setAuthPassword('');
+        }).catch(err => alert(err.message));
       }
-      setShowAuthModal(false);
-      setAuthEmail(''); setAuthPassword('');
     } catch (error) {
       alert(error.message);
     }
-  };
+  }
 
-  const handleGoogleAuth = async () => {
-    try {
-      await signInWithPopup(auth, provider);
+  function handleGoogleAuth() {
+    signInWithPopup(auth, provider).then(() => {
       setShowAuthModal(false);
-    } catch (error) {
-      console.error("Google Sign In Error:", error);
-    }
-  };
+    }).catch((error) => console.error("Google Sign In Error:", error));
+  }
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    setCurrentTab('Home');
-  };
+  function handleLogout() {
+    signOut(auth).then(() => {
+      setCurrentTab('Home');
+    });
+  }
 
-  const toggleLibrary = async (targetItem) => {
+  function toggleLibrary(targetItem) {
     if (!user) {
       setShowAuthModal(true);
       return;
@@ -143,7 +178,7 @@ export default function App() {
     try {
       if (isSaved) {
         const itemToRemove = myLibrary.find(item => item.id === targetItem.id);
-        await deleteDoc(doc(db, "users", user.uid, "library", itemToRemove.docId));
+        deleteDoc(doc(db, "users", user.uid, "library", itemToRemove.docId)).then(() => fetchLibrary(user.uid));
       } else {
         const itemData = {
           id: targetItem.id,
@@ -153,65 +188,57 @@ export default function App() {
           release_date: targetItem.release_date || targetItem.first_air_date || '',
           media_type: targetItem.media_type || mediaType || 'movie'
         };
-        await addDoc(collection(db, "users", user.uid, "library"), itemData);
+        addDoc(collection(db, "users", user.uid, "library"), itemData).then(() => fetchLibrary(user.uid));
       }
-      fetchLibrary(user.uid);
     } catch (error) {
       console.error("Error updating library:", error);
     }
-  };
+  }
 
-  const checkInLibrary = (id) => myLibrary.some(item => item.id === id);
+  function checkInLibrary(id) {
+    return myLibrary.some(item => item.id === id);
+  }
 
-  // --- REAL-TIME WATCH PARTY LOGIC ---
-
-  const hostParty = async () => {
+  function hostParty() {
     if (!user) return setShowAuthModal(true);
     if (!activeItem) return;
     
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    try {
-      await setDoc(doc(db, "parties", code), {
-        hostId: user.uid,
-        mediaId: activeItem.id,
-        mediaType: mediaType,
-        season: season,
-        episode: episode,
-        createdAt: serverTimestamp()
-      });
+    setDoc(doc(db, "parties", code), {
+      hostId: user.uid,
+      mediaId: activeItem.id,
+      mediaType: mediaType,
+      season: season,
+      episode: episode,
+      createdAt: serverTimestamp()
+    }).then(() => {
       setGeneratedPartyCode(code);
-    } catch (error) {
-      console.error("Error creating party:", error);
-    }
-  };
+    }).catch(err => console.error("Error creating party:", err));
+  }
 
-  const joinParty = async () => {
+  function joinParty() {
     if (!user) return setShowAuthModal(true);
     if (!partyCode.trim()) return;
 
-    try {
-      const docRef = doc(db, "parties", partyCode);
-      const docSnap = await getDoc(docRef);
-      
+    const docRef = doc(db, "parties", partyCode);
+    getDoc(docRef).then((docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
-        
-        const res = await fetch(`${BASE_URL}/${data.mediaType}/${data.mediaId}?api_key=${TMDB_API_KEY}`);
-        const item = await res.json();
-        
-        setMediaType(data.mediaType);
-        setActiveItem(item);
-        setSeason(data.season || 1);
-        setEpisode(data.episode || 1);
-        setCurrentPartyCode(partyCode);
-        setPartyCode(''); 
+        fetch(`${BASE_URL}/${data.mediaType}/${data.mediaId}?api_key=${TMDB_API_KEY}`)
+          .then(res => res.json())
+          .then(item => {
+            setMediaType(data.mediaType);
+            setActiveItem(item);
+            setSeason(data.season || 1);
+            setEpisode(data.episode || 1);
+            setCurrentPartyCode(partyCode);
+            setPartyCode(''); 
+          });
       } else {
         alert("Invalid Party Code! The party may have ended.");
       }
-    } catch (error) {
-      console.error("Error joining party:", error);
-    }
-  };
+    }).catch(err => console.error("Error joining party:", err));
+  }
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -254,30 +281,25 @@ export default function App() {
     }
   }, [season, episode]);
 
-  const sendChatMessage = async (e) => {
+  function sendChatMessage(e) {
     e.preventDefault();
     if (!newMessage.trim() || !currentPartyCode) return;
     
-    try {
-      await addDoc(collection(db, "parties", currentPartyCode, "messages"), {
-        text: newMessage,
-        userId: user.uid,
-        userName: user?.displayName || user?.email?.split('@')[0] || 'User',
-        createdAt: serverTimestamp()
-      });
+    addDoc(collection(db, "parties", currentPartyCode, "messages"), {
+      text: newMessage,
+      userId: user.uid,
+      userName: user?.displayName || user?.email?.split('@')[0] || 'User',
+      createdAt: serverTimestamp()
+    }).then(() => {
       setNewMessage('');
-    } catch (error) {
-      console.error("Error sending message:", error);
-    }
-  };
+    }).catch(err => console.error("Error sending message:", err));
+  }
 
-  // --- END PARTY LOGIC ---
-
-  const resetFilters = () => {
+  function resetFilters() {
     setFilterGenre(''); setFilterLang(''); setFilterYear(''); setFilterRating(''); setFilterSort('popularity.desc');
-  };
+  }
 
-  const handleNavClick = (tabName, type) => {
+  function handleNavClick(tabName, type) {
     setCurrentTab(tabName);
     setActiveItem(null);
     setSearchQuery('');
@@ -303,7 +325,7 @@ export default function App() {
     if (tabName === 'Watch Later' && user) {
       fetchLibrary(user.uid);
     }
-  };
+  }
 
   useEffect(() => {
     setSeason(1); setEpisode(1); setItemDetails(null); setIsOverviewExpanded(false); setRecommendations([]);
@@ -325,19 +347,15 @@ export default function App() {
 
   useEffect(() => {
     if (currentTab === 'Home') {
-      const fetchData = async () => {
-        try {
-          const [dayRes, weekRes, newRes] = await Promise.all([
-            fetch(`${BASE_URL}/trending/${mediaType}/day?api_key=${TMDB_API_KEY}`).then(r => r.json()),
-            fetch(`${BASE_URL}/trending/${mediaType}/week?api_key=${TMDB_API_KEY}`).then(r => r.json()),
-            fetch(`${BASE_URL}/${mediaType}/${mediaType === 'movie' ? 'now_playing' : 'on_the_air'}?api_key=${TMDB_API_KEY}`).then(r => r.json())
-          ]);
-          setTrendingDay(dayRes.results || []);
-          setTrendingWeek(weekRes.results || []);
-          setNewest(newRes.results || []);
-        } catch (err) { console.error("API Error:", err); }
-      };
-      fetchData();
+      Promise.all([
+        fetch(`${BASE_URL}/trending/${mediaType}/day?api_key=${TMDB_API_KEY}`).then(r => r.json()),
+        fetch(`${BASE_URL}/trending/${mediaType}/week?api_key=${TMDB_API_KEY}`).then(r => r.json()),
+        fetch(`${BASE_URL}/${mediaType}/${mediaType === 'movie' ? 'now_playing' : 'on_the_air'}?api_key=${TMDB_API_KEY}`).then(r => r.json())
+      ]).then(([dayRes, weekRes, newRes]) => {
+        setTrendingDay(dayRes.results || []);
+        setTrendingWeek(weekRes.results || []);
+        setNewest(newRes.results || []);
+      }).catch(err => console.error("API Error:", err));
     }
   }, [mediaType, currentTab]);
 
@@ -1130,42 +1148,6 @@ export default function App() {
         </div>
       </nav>
 
-    </div>
-  );
-}
-
-// --- REUSABLE COMPONENTS ---
-function MovieRow({ title, items, onClickItem, mediaType, isLive }) {
-  if (!items || items.length === 0) return null;
-  return (
-    <div style={{ marginBottom: '40px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px' }}>
-        <h3 style={{ fontSize: '1.5rem', margin: 0 }}>{title}</h3>
-        {isLive && <span style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', border: '1px solid #ef4444' }}>Live</span>}
-      </div>
-      <div className="hide-scroll" style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '15px' }}>
-        {items.filter(i => i.poster_path).map(item => (
-          <MovieCard key={item.id} item={item} onClick={() => onClickItem(item)} mediaType={mediaType} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MovieCard({ item, onClick, mediaType, isGrid }) {
-  const ratingScore = Math.round(item.vote_average * 10);
-  return (
-    <div className="movie-card" onClick={onClick} style={{ minWidth: isGrid ? '0' : '160px', width: isGrid ? '100%' : '160px', position: 'relative', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer', backgroundColor: '#1e293b' }}>
-      <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={getTitle(item)} style={{ width: '100%', height: isGrid ? 'auto' : '240px', aspectRatio: isGrid ? '2/3' : 'auto', objectFit: 'cover', display: 'block' }} />
-      <div className="mobile-hide" style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '60%', background: 'linear-gradient(0deg, rgba(0,0,0,0.95) 0%, transparent 100%)' }}></div>
-      <div style={{ position: 'absolute', top: '8px', left: '8px', backgroundColor: '#3b82f6', color: '#fff', padding: '3px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '900' }}>✦ NEW</div>
-      <div style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: getRatingColor(item.vote_average), color: '#fff', padding: '3px 6px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '900' }}>★ {ratingScore}%</div>
-      <div className="mobile-hide" style={{ position: 'absolute', bottom: '12px', left: '12px', right: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: '6px', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 'bold' }}>
-          <span>{getYear(item)}</span>
-          <span style={{ textTransform: 'capitalize' }}>{mediaType}</span>
-        </div>
-      </div>
     </div>
   );
 }
