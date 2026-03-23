@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { auth, provider, db } from './firebase';
 import { signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
-// NEW: Imported Real-time Listeners and Database operations
 import { collection, addDoc, getDocs, query, deleteDoc, doc, setDoc, getDoc, updateDoc, onSnapshot, serverTimestamp, orderBy } from 'firebase/firestore';
 
 const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
@@ -195,7 +194,6 @@ export default function App() {
       if (docSnap.exists()) {
         const data = docSnap.data();
         
-        // Fetch the movie/show the party is watching
         const res = await fetch(`${BASE_URL}/${data.mediaType}/${data.mediaId}?api_key=${TMDB_API_KEY}`);
         const item = await res.json();
         
@@ -204,7 +202,7 @@ export default function App() {
         setSeason(data.season || 1);
         setEpisode(data.episode || 1);
         setCurrentPartyCode(partyCode);
-        setPartyCode(''); // clear input
+        setPartyCode(''); 
       } else {
         alert("Invalid Party Code! The party may have ended.");
       }
@@ -213,22 +211,18 @@ export default function App() {
     }
   };
 
-  // Chat Auto-Scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Sync Party Database listeners
   useEffect(() => {
     if (!currentPartyCode) return;
 
-    // 1. Listen for Host playback changes
     const unsubParty = onSnapshot(doc(db, "parties", currentPartyCode), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
         setPartyData(data);
         
-        // If I am NOT the host, force my UI to sync with the database
         if (user && data.hostId !== user.uid) {
           if (data.season && data.season !== season) setSeason(data.season);
           if (data.episode && data.episode !== episode) setEpisode(data.episode);
@@ -236,7 +230,6 @@ export default function App() {
       }
     });
 
-    // 2. Listen for Chat Messages
     const q = query(collection(db, "parties", currentPartyCode, "messages"), orderBy("createdAt", "asc"));
     const unsubChat = onSnapshot(q, (snapshot) => {
       const msgs = [];
@@ -250,7 +243,6 @@ export default function App() {
     };
   }, [currentPartyCode, user]);
 
-  // If I AM the host, update the database when I change season/episode
   useEffect(() => {
     if (currentPartyCode && partyData && user && partyData.hostId === user.uid) {
        updateDoc(doc(db, "parties", currentPartyCode), {
@@ -268,7 +260,8 @@ export default function App() {
       await addDoc(collection(db, "parties", currentPartyCode, "messages"), {
         text: newMessage,
         userId: user.uid,
-        userName: user.displayName || user.email.split('@')[0],
+        // SAFE EXTRACT: Forces a string fallback if email is somehow missing
+        userName: user?.displayName || user?.email?.split('@')[0] || 'User',
         createdAt: serverTimestamp()
       });
       setNewMessage('');
@@ -467,8 +460,6 @@ export default function App() {
         .static-page p { margin-bottom: 20px; }
 
         .player-wrapper { display: flex; gap: 30px; align-items: flex-start; }
-        
-        /* FIX: Dedicated class to strictly control iframe sizing and overflow */
         .iframe-container { position: relative; width: 100%; padding-top: 56.25%; background-color: #000; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.8); }
 
         @media (max-width: 900px) {
@@ -508,7 +499,6 @@ export default function App() {
           .player-meta img { width: 120px !important; }
           .mobile-hide { display: none !important; }
 
-          /* FIX: Stripped excess mobile padding so iframe can stretch side-to-side cleanly */
           .player-container { padding: 15px 15px !important; margin-top: 10px; }
           .iframe-container { border-radius: 8px; }
           .section-padding { padding: 0 20px !important; margin-top: 60px !important; position: relative; z-index: 10; }
@@ -603,11 +593,11 @@ export default function App() {
           </div>
           
           {user ? (
-            user.photoURL ? (
+            user?.photoURL ? (
               <img src={user.photoURL} alt="Profile" className="user-avatar" onClick={() => setCurrentTab('Account')} title="My Account" />
             ) : (
               <div className="user-avatar" onClick={() => setCurrentTab('Account')} title="My Account">
-                {user.email.charAt(0).toUpperCase()}
+                {user?.email?.charAt(0)?.toUpperCase() || 'U'}
               </div>
             )
           ) : (
@@ -660,15 +650,15 @@ export default function App() {
          <div className="static-page" style={{ textAlign: 'center' }}>
            {user ? (
              <>
-               {user.photoURL ? (
+               {user?.photoURL ? (
                  <img src={user.photoURL} alt="Profile" style={{ width: '100px', height: '100px', borderRadius: '50%', border: '4px solid #ef4444', marginBottom: '20px', objectFit: 'cover' }} />
                ) : (
                  <div style={{ width: '100px', height: '100px', borderRadius: '50%', border: '4px solid #ef4444', marginBottom: '20px', backgroundColor: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '3rem', margin: '0 auto 20px auto', fontWeight: 'bold' }}>
-                   {user.email.charAt(0).toUpperCase()}
+                   {user?.email?.charAt(0)?.toUpperCase() || 'U'}
                  </div>
                )}
                <h1>Welcome back</h1>
-               <p style={{ fontSize: '1.2rem', color: '#94a3b8' }}>{user.email}</p>
+               <p style={{ fontSize: '1.2rem', color: '#94a3b8' }}>{user?.email}</p>
                
                <div style={{ backgroundColor: '#1e293b', padding: '30px', borderRadius: '12px', margin: '40px 0', textAlign: 'left' }}>
                  <h3>Account Settings</h3>
