@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { auth, provider, db } from './firebase';
 import { signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
-import { collection, addDoc, getDocs, query, deleteDoc, doc } from 'firebase/firestore';
+// NEW: Imported Real-time Listeners and Database operations
+import { collection, addDoc, getDocs, query, deleteDoc, doc, setDoc, getDoc, updateDoc, onSnapshot, serverTimestamp, orderBy } from 'firebase/firestore';
 
 const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 const BASE_URL = 'https://api.themoviedb.org/3';
@@ -58,6 +59,7 @@ export default function App() {
   const [filterRating, setFilterRating] = useState('');
   const [filterSort, setFilterSort] = useState('popularity.desc');
 
+  // Firebase Auth, Library & Recommendations State
   const [user, setUser] = useState(null);
   const [myLibrary, setMyLibrary] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
@@ -67,11 +69,14 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   
+  // PARTY SYSTEM STATES
   const [partyCode, setPartyCode] = useState('');
   const [generatedPartyCode, setGeneratedPartyCode] = useState(null);
-  
-  // NEW: State to track if the user is currently in an active Watch Party room
   const [currentPartyCode, setCurrentPartyCode] = useState(null);
+  const [partyData, setPartyData] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
+  const messagesEndRef = useRef(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -157,11 +162,122 @@ export default function App() {
 
   const checkInLibrary = (id) => myLibrary.some(item => item.id === id);
 
-  const hostParty = () => {
+  // --- REAL-TIME WATCH PARTY LOGIC ---
+
+  const hostParty = async () => {
     if (!user) return setShowAuthModal(true);
+    if (!activeItem) return;
+    
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    setGeneratedPartyCode(code);
+    try {
+      await setDoc(doc(db, "parties", code), {
+        hostId: user.uid,
+        mediaId: activeItem.id,
+        mediaType: mediaType,
+        season: season,
+        episode: episode,
+        createdAt: serverTimestamp()
+      });
+      setGeneratedPartyCode(code);
+    } catch (error) {
+      console.error("Error creating party:", error);
+    }
   };
+
+  const joinParty = async () => {
+    if (!user) return setShowAuthModal(true);
+    if (!partyCode.trim()) return;
+
+    try {
+      const docRef = doc(db, "parties", partyCode);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        
+        // Fetch the movie/show the party is watching
+        const res = await fetch(`${BASE_URL}/${data.mediaType}/${data.mediaId}?api_key=${TMDB_API_KEY}`);
+        const item = await res.json();
+        
+        setMediaType(data.mediaType);
+        setActiveItem(item);
+        setSeason(data.season || 1);
+        setEpisode(data.episode || 1);
+        setCurrentPartyCode(partyCode);
+        setPartyCode(''); // clear input
+      } else {
+        alert("Invalid Party Code! The party may have ended.");
+      }
+    } catch (error) {
+      console.error("Error joining party:", error);
+    }
+  };
+
+  // Chat Auto-Scroll
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Sync Party Database listeners
+  useEffect(() => {
+    if (!currentPartyCode) return;
+
+    // 1. Listen for Host playback changes
+    const unsubParty = onSnapshot(doc(db, "parties", currentPartyCode), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setPartyData(data);
+        
+        // If I am NOT the host, force my UI to sync with the database
+        if (user && data.hostId !== user.uid) {
+          if (data.season && data.season !== season) setSeason(data.season);
+          if (data.episode && data.episode !== episode) setEpisode(data.episode);
+        }
+      }
+    });
+
+    // 2. Listen for Chat Messages
+    const q = query(collection(db, "parties", currentPartyCode, "messages"), orderBy("createdAt", "asc"));
+    const unsubChat = onSnapshot(q, (snapshot) => {
+      const msgs = [];
+      snapshot.forEach(doc => msgs.push({ id: doc.id, ...doc.data() }));
+      setMessages(msgs);
+    });
+
+    return () => {
+      unsubParty();
+      unsubChat();
+    };
+  }, [currentPartyCode, user]);
+
+  // If I AM the host, update the database when I change season/episode
+  useEffect(() => {
+    if (currentPartyCode && partyData && user && partyData.hostId === user.uid) {
+       updateDoc(doc(db, "parties", currentPartyCode), {
+          season: season,
+          episode: episode
+       }).catch(err => console.error(err));
+    }
+  }, [season, episode]);
+
+  const sendChatMessage = async (e) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !currentPartyCode) return;
+    
+    try {
+      await addDoc(collection(db, "parties", currentPartyCode, "messages"), {
+        text: newMessage,
+        userId: user.uid,
+        userName: user.displayName || user.email.split('@')[0],
+        createdAt: serverTimestamp()
+      });
+      setNewMessage('');
+    } catch (error) {
+      console.error("Error sending message:", error);
+    }
+  };
+
+  // --- END PARTY LOGIC ---
 
   const resetFilters = () => {
     setFilterGenre(''); setFilterLang(''); setFilterYear(''); setFilterRating(''); setFilterSort('popularity.desc');
@@ -350,8 +466,10 @@ export default function App() {
         .static-page h2 { color: #fff; margin-top: 30px; margin-bottom: 10px; }
         .static-page p { margin-bottom: 20px; }
 
-        /* NEW: Flex wrapper for the split Player / Chat layout */
         .player-wrapper { display: flex; gap: 30px; align-items: flex-start; }
+        
+        /* FIX: Dedicated class to strictly control iframe sizing and overflow */
+        .iframe-container { position: relative; width: 100%; padding-top: 56.25%; background-color: #000; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.8); }
 
         @media (max-width: 900px) {
           .nav-links { display: none; }
@@ -390,7 +508,9 @@ export default function App() {
           .player-meta img { width: 120px !important; }
           .mobile-hide { display: none !important; }
 
-          .player-container { padding: 20px 20px !important; }
+          /* FIX: Stripped excess mobile padding so iframe can stretch side-to-side cleanly */
+          .player-container { padding: 15px 15px !important; margin-top: 10px; }
+          .iframe-container { border-radius: 8px; }
           .section-padding { padding: 0 20px !important; margin-top: 60px !important; position: relative; z-index: 10; }
           
           .browse-container { padding: 40px 15px 120px 15px !important; } 
@@ -401,9 +521,8 @@ export default function App() {
           .filter-wrapper.sort-filter { margin-left: 0 !important; }
           .clear-filters-btn { width: 100%; justify-content: center; }
 
-          /* Stack Player and Chat on Mobile */
-          .player-wrapper { flex-direction: column; }
-          .chat-sidebar { width: 100% !important; height: 500px; margin-bottom: 20px; }
+          .player-wrapper { flex-direction: column; gap: 20px; }
+          .chat-sidebar { width: 100% !important; height: 450px; margin-bottom: 20px; }
         }
       `}</style>
 
@@ -450,7 +569,6 @@ export default function App() {
             <div style={{ backgroundColor: '#1e293b', padding: '20px', borderRadius: '8px', fontSize: '2rem', fontWeight: '900', letterSpacing: '4px', color: '#8b5cf6', marginBottom: '20px' }}>
               {generatedPartyCode}
             </div>
-            {/* UPDATED: Sets the current party room state to active! */}
             <button onClick={() => { setCurrentPartyCode(generatedPartyCode); setGeneratedPartyCode(null); }} style={{ backgroundColor: '#8b5cf6', color: '#fff', border: 'none', padding: '12px 30px', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', width: '100%' }}>Close & Watch</button>
           </div>
         </div>
@@ -526,7 +644,7 @@ export default function App() {
              <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '20px' }}>Enter the 6-digit code shared by your friend.</p>
              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
                <input type="text" placeholder="Enter Code" value={partyCode} onChange={e => setPartyCode(e.target.value.toUpperCase())} maxLength={6} style={{ padding: '12px 20px', borderRadius: '8px', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#fff', outline: 'none', textTransform: 'uppercase', width: '150px', textAlign: 'center', fontWeight: 'bold', fontSize: '1.2rem' }} />
-               <button className="auth-btn" style={{ backgroundColor: '#8b5cf6' }} onClick={() => alert("Party connection via Firestore coming next update!")}>Join</button>
+               <button className="auth-btn" style={{ backgroundColor: '#8b5cf6' }} onClick={joinParty}>Join</button>
              </div>
            </div>
  
@@ -657,15 +775,16 @@ export default function App() {
        
        activeItem ? (
         
-        /* --- PLAYER VIEW (WITH NEW SPLIT PARTY WRAPPER) --- */
+        /* --- PLAYER VIEW (WITH SPLIT PARTY WRAPPER) --- */
         <div className="player-container" style={{ paddingTop: '40px', width: '100%', maxWidth: '1600px', margin: '0 auto', padding: '40px 40px 40px 40px' }}>
-          <button onClick={() => setActiveItem(null)} style={{ padding: '10px 20px', marginBottom: '20px', cursor: 'pointer', backgroundColor: '#1e293b', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>← Back</button>
+          <button onClick={() => { setActiveItem(null); setCurrentPartyCode(null); }} style={{ padding: '10px 20px', marginBottom: '20px', cursor: 'pointer', backgroundColor: '#1e293b', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>← Back</button>
           
           <div className="player-wrapper">
             
             {/* LEFT COLUMN: THE MOVIE & META */}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', backgroundColor: '#000', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.8)' }}>
+              
+              <div className="iframe-container">
                 <iframe src={mediaType === 'movie' ? `https://vidsrc.net/embed/movie/${activeItem.id}` : `https://vidsrc.net/embed/tv?tmdb=${activeItem.id}&season=${season}&episode=${episode}`} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allowFullScreen></iframe>
               </div>
 
@@ -696,7 +815,6 @@ export default function App() {
                     
                     <div style={{ display: 'flex', gap: '10px' }}>
                       
-                      {/* DYNAMIC HOST/LEAVE PARTY BUTTON */}
                       {currentPartyCode ? (
                         <button onClick={() => setCurrentPartyCode(null)} style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background 0.2s' }}>
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
@@ -784,7 +902,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* RIGHT COLUMN: MOCK LIVE CHAT UI (Only visible if Party Code is active) */}
+            {/* RIGHT COLUMN: REAL-TIME CHAT UI */}
             {currentPartyCode && (
               <div className="chat-sidebar" style={{ width: '350px', backgroundColor: '#0f172a', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
                 
@@ -797,37 +915,34 @@ export default function App() {
                   <span style={{ backgroundColor: '#8b5cf6', color: '#fff', padding: '4px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', letterSpacing: '1px' }}>{currentPartyCode}</span>
                 </div>
                 
-                {/* Mock Messages Area */}
+                {/* Messages Area */}
                 <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px', minHeight: '400px' }}>
+                  
                   <div style={{ alignSelf: 'center', backgroundColor: '#1e293b', padding: '6px 16px', borderRadius: '20px', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>
-                    You started the party
-                  </div>
-                  <div style={{ alignSelf: 'center', backgroundColor: '#1e293b', padding: '6px 16px', borderRadius: '20px', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>
-                    Nathali joined the party
+                    Room Created
                   </div>
                   
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', marginTop: '10px' }}>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '4px', marginRight: '5px' }}>You</span>
-                    <div style={{ backgroundColor: '#2563eb', color: '#fff', padding: '10px 15px', borderRadius: '16px 16px 4px 16px', fontSize: '0.95rem', maxWidth: '85%', lineHeight: '1.4' }}>
-                      Are you ready? Let me know when to hit play!
-                    </div>
-                  </div>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '4px', marginLeft: '5px' }}>Nathali</span>
-                    <div style={{ backgroundColor: '#1e293b', color: '#e2e8f0', padding: '10px 15px', borderRadius: '16px 16px 16px 4px', fontSize: '0.95rem', maxWidth: '85%', lineHeight: '1.4' }}>
-                      Popcorn secured 🍿 Pressing play in 3.. 2.. 1.. GO!
-                    </div>
-                  </div>
+                  {messages.map(msg => {
+                    const isMe = msg.userId === user?.uid;
+                    return (
+                      <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '4px', margin: isMe ? '0 5px 0 0' : '0 0 0 5px' }}>{isMe ? 'You' : msg.userName}</span>
+                        <div style={{ backgroundColor: isMe ? '#2563eb' : '#1e293b', color: isMe ? '#fff' : '#e2e8f0', padding: '10px 15px', borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px', fontSize: '0.95rem', maxWidth: '85%', lineHeight: '1.4', wordBreak: 'break-word' }}>
+                          {msg.text}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <div ref={messagesEndRef} />
                 </div>
 
-                {/* Chat Input */}
-                <div style={{ padding: '15px', borderTop: '1px solid #1e293b', display: 'flex', gap: '10px', backgroundColor: '#0b101e' }}>
-                  <input type="text" placeholder="Type a message..." style={{ flex: 1, padding: '12px 15px', borderRadius: '20px', border: '1px solid #334155', backgroundColor: '#1e293b', color: '#fff', outline: 'none', fontSize: '0.95rem' }} />
-                  <button style={{ backgroundColor: '#8b5cf6', color: '#fff', border: 'none', width: '42px', height: '42px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', transition: 'transform 0.2s' }}>
+                {/* Chat Input Form */}
+                <form onSubmit={sendChatMessage} style={{ padding: '15px', borderTop: '1px solid #1e293b', display: 'flex', gap: '10px', backgroundColor: '#0b101e' }}>
+                  <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Type a message..." style={{ flex: 1, padding: '12px 15px', borderRadius: '20px', border: '1px solid #334155', backgroundColor: '#1e293b', color: '#fff', outline: 'none', fontSize: '0.95rem' }} />
+                  <button type="submit" style={{ backgroundColor: '#8b5cf6', color: '#fff', border: 'none', width: '42px', height: '42px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', transition: 'transform 0.2s' }}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
                   </button>
-                </div>
+                </form>
 
               </div>
             )}
@@ -1019,7 +1134,6 @@ export default function App() {
         <div className={`mob-nav-item ${currentTab === 'Watch Later' ? 'active' : ''}`} onClick={() => handleNavClick('Watch Later')}>
           {Icons.Library} <span>Later</span>
         </div>
-        {/* NEW: Swapped Search for Parties */}
         <div className={`mob-nav-item ${currentTab === 'Parties' ? 'active' : ''}`} onClick={() => handleNavClick('Parties')}>
           {Icons.Parties} <span>Parties</span>
         </div>
