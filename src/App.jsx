@@ -77,15 +77,7 @@ export default function App() {
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) fetchLibrary(currentUser.uid);
-      else setMyLibrary([]);
-    });
-    return () => unsubscribe();
-  }, []);
-
+  // 1. DEFINE fetchLibrary FIRST (Fixes the TDZ crash!)
   const fetchLibrary = async (uid) => {
     try {
       const q = query(collection(db, "users", uid, "library"));
@@ -99,6 +91,16 @@ export default function App() {
       console.error("Error fetching library:", error);
     }
   };
+
+  // 2. CALL IT SECOND
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) fetchLibrary(currentUser.uid);
+      else setMyLibrary([]);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleEmailAuth = async (e) => {
     e.preventDefault();
@@ -260,7 +262,6 @@ export default function App() {
       await addDoc(collection(db, "parties", currentPartyCode, "messages"), {
         text: newMessage,
         userId: user.uid,
-        // SAFE EXTRACT: Forces a string fallback if email is somehow missing
         userName: user?.displayName || user?.email?.split('@')[0] || 'User',
         createdAt: serverTimestamp()
       });
