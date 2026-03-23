@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { auth, provider, db } from './firebase';
-import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+// NEW: Imported Email Auth functions
+import { signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { collection, addDoc, getDocs, query, deleteDoc, doc } from 'firebase/firestore';
 
 const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
@@ -58,11 +59,19 @@ export default function App() {
   const [filterRating, setFilterRating] = useState('');
   const [filterSort, setFilterSort] = useState('popularity.desc');
 
-  // Firebase Auth & Library State
+  // Firebase Auth, Library & Recommendations State
   const [user, setUser] = useState(null);
   const [myLibrary, setMyLibrary] = useState([]);
+  const [recommendations, setRecommendations] = useState([]);
+  
+  // NEW: Auth Modal & Party States
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [partyCode, setPartyCode] = useState('');
+  const [generatedPartyCode, setGeneratedPartyCode] = useState(null);
 
-  // Monitor User Login Status
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -86,15 +95,28 @@ export default function App() {
     }
   };
 
-  const handleAuth = async () => {
-    if (user) {
-      setCurrentTab('Account');
-    } else {
-      try {
-        await signInWithPopup(auth, provider);
-      } catch (error) {
-        console.error("Google Sign In Error:", error);
+  // --- NEW: Email & Google Auth Handlers ---
+  const handleEmailAuth = async (e) => {
+    e.preventDefault();
+    try {
+      if (isSignUp) {
+        await createUserWithEmailAndPassword(auth, authEmail, authPassword);
+      } else {
+        await signInWithEmailAndPassword(auth, authEmail, authPassword);
       }
+      setShowAuthModal(false);
+      setAuthEmail(''); setAuthPassword('');
+    } catch (error) {
+      alert(error.message);
+    }
+  };
+
+  const handleGoogleAuth = async () => {
+    try {
+      await signInWithPopup(auth, provider);
+      setShowAuthModal(false);
+    } catch (error) {
+      console.error("Google Sign In Error:", error);
     }
   };
 
@@ -103,10 +125,9 @@ export default function App() {
     setCurrentTab('Home');
   };
 
-  // Upgraded toggleLibrary to accept any specific item (like the hero banner!)
   const toggleLibrary = async (targetItem) => {
     if (!user) {
-      alert("Please sign in with Google to save to Watch Later!");
+      setShowAuthModal(true);
       return;
     }
     if (!targetItem) return;
@@ -134,8 +155,14 @@ export default function App() {
     }
   };
 
-  // Reusable check to see if any item is in the library
   const checkInLibrary = (id) => myLibrary.some(item => item.id === id);
+
+  // --- NEW: Host Party Logic ---
+  const hostParty = () => {
+    if (!user) return setShowAuthModal(true);
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    setGeneratedPartyCode(code);
+  };
 
   const resetFilters = () => {
     setFilterGenre(''); setFilterLang(''); setFilterYear(''); setFilterRating(''); setFilterSort('popularity.desc');
@@ -154,8 +181,8 @@ export default function App() {
 
     if (tabName === 'Anime') {
       setMediaType('tv');
-      setFilterGenre('16'); // TMDB Animation genre
-      setFilterLang('ja');  // Japanese
+      setFilterGenre('16'); 
+      setFilterLang('ja');  
       setFilterSort('popularity.desc');
       setFilterYear('');
       setFilterRating('');
@@ -170,10 +197,14 @@ export default function App() {
   };
 
   useEffect(() => {
-    setSeason(1); setEpisode(1); setItemDetails(null); setIsOverviewExpanded(false);
+    setSeason(1); setEpisode(1); setItemDetails(null); setIsOverviewExpanded(false); setRecommendations([]);
     if (activeItem) {
       fetch(`${BASE_URL}/${mediaType}/${activeItem.id}?api_key=${TMDB_API_KEY}&append_to_response=credits`)
         .then(res => res.json()).then(data => setItemDetails(data));
+      
+      // NEW: Fetch Recommendations
+      fetch(`${BASE_URL}/${mediaType}/${activeItem.id}/recommendations?api_key=${TMDB_API_KEY}`)
+        .then(res => res.json()).then(data => setRecommendations(data.results || []));
     }
   }, [activeItem, mediaType]);
 
@@ -255,14 +286,6 @@ export default function App() {
   const selectedSeasonData = availableSeasons.find(s => s.season_number === season);
   const episodeCount = selectedSeasonData?.episode_count || 1;
 
-  const renderPlaceholder = (title) => (
-    <div style={{ height: '60vh', display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', color: '#64748b' }}>
-      {Icons[title]}
-      <h2 style={{ marginTop: '20px', color: '#fff' }}>{title}</h2>
-      <p>This feature is coming soon to SOKOFLIX.</p>
-    </div>
-  );
-
   return (
     <div style={{ backgroundColor: '#060913', color: '#fff', minHeight: '100vh', fontFamily: 'Helvetica, Arial, sans-serif', paddingBottom: '100px', overflowX: 'hidden' }}>
       
@@ -292,7 +315,9 @@ export default function App() {
         
         .auth-btn { display: flex; align-items: center; gap: 8px; background-color: #dc2626; color: #fff; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: background 0.2s; font-size: 0.9rem; }
         .auth-btn:hover { background-color: #b91c1c; }
-        .user-avatar { width: 42px; height: 42px; border-radius: 50%; border: 2px solid #2563eb; cursor: pointer; object-fit: cover; transition: border-color 0.2s; }
+        
+        /* NEW: Default User Avatar styling if they sign up with email and have no photo */
+        .user-avatar { width: 42px; height: 42px; border-radius: 50%; border: 2px solid #2563eb; cursor: pointer; object-fit: cover; transition: border-color 0.2s; background-color: #1e293b; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-weight: bold; font-size: 1.2rem; }
         .user-avatar:hover { border-color: #60a5fa; }
 
         .mobile-bottom-nav { display: none; }
@@ -328,7 +353,6 @@ export default function App() {
           
           .media-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
           
-          /* FIX: Tighter padding, perfectly synced border-radius to match outer pill shape */
           .mobile-bottom-nav { 
             display: flex; justify-content: space-between; align-items: center; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); width: calc(100% - 30px); max-width: 450px; background-color: rgba(15, 23, 42, 0.95); backdrop-filter: blur(20px); padding: 4px; border-radius: 40px; z-index: 1000; box-shadow: 0 20px 40px rgba(0,0,0,0.8); border: 1px solid rgba(255,255,255,0.05); box-sizing: border-box; 
           }
@@ -371,16 +395,62 @@ export default function App() {
         }
       `}</style>
 
+      {/* --- NEW: FLOATING AUTH MODAL --- */}
+      {showAuthModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 10000, display: 'flex', justifyContent: 'center', alignItems: 'center', backdropFilter: 'blur(5px)' }}>
+          <div style={{ backgroundColor: '#0f172a', padding: '40px', borderRadius: '16px', width: '90%', maxWidth: '400px', position: 'relative', border: '1px solid #1e293b', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)' }}>
+            <button onClick={() => setShowAuthModal(false)} style={{ position: 'absolute', top: '15px', right: '15px', background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: '1.5rem' }}>✕</button>
+            <h2 style={{ margin: '0 0 20px 0', textAlign: 'center' }}>{isSignUp ? 'Create Account' : 'Welcome Back'}</h2>
+            
+            <form onSubmit={handleEmailAuth} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+              <input type="email" placeholder="Email Address" required value={authEmail} onChange={e => setAuthEmail(e.target.value)} style={{ padding: '12px 15px', borderRadius: '8px', border: '1px solid #334155', backgroundColor: '#1e293b', color: '#fff', fontSize: '1rem', outline: 'none' }} />
+              <input type="password" placeholder="Password" required value={authPassword} onChange={e => setAuthPassword(e.target.value)} style={{ padding: '12px 15px', borderRadius: '8px', border: '1px solid #334155', backgroundColor: '#1e293b', color: '#fff', fontSize: '1rem', outline: 'none' }} />
+              <button type="submit" style={{ backgroundColor: '#dc2626', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' }}>{isSignUp ? 'Sign Up' : 'Sign In'}</button>
+            </form>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '20px 0', color: '#64748b', fontSize: '0.9rem' }}>
+              <div style={{ flex: 1, height: '1px', backgroundColor: '#334155' }}></div>
+              <span>OR</span>
+              <div style={{ flex: 1, height: '1px', backgroundColor: '#334155' }}></div>
+            </div>
+
+            <button onClick={handleGoogleAuth} style={{ width: '100%', backgroundColor: '#fff', color: '#0f172a', border: 'none', padding: '12px', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '10px' }}>
+              <svg width="20" height="20" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+              Continue with Google
+            </button>
+
+            <p style={{ textAlign: 'center', marginTop: '20px', color: '#94a3b8', fontSize: '0.9rem' }}>
+              {isSignUp ? 'Already have an account?' : "Don't have an account?"} 
+              <span onClick={() => setIsSignUp(!isSignUp)} style={{ color: '#60a5fa', cursor: 'pointer', marginLeft: '5px', fontWeight: 'bold' }}>
+                {isSignUp ? 'Sign In' : 'Sign Up'}
+              </span>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* --- NEW: PARTY CODE MODAL --- */}
+      {generatedPartyCode && (
+        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(0,0,0,0.8)', zIndex: 10000, display: 'flex', justifyContent: 'center', alignItems: 'center', backdropFilter: 'blur(5px)' }}>
+          <div style={{ backgroundColor: '#0f172a', padding: '40px', borderRadius: '16px', width: '90%', maxWidth: '400px', textAlign: 'center', border: '1px solid #8b5cf6', boxShadow: '0 0 30px rgba(139, 92, 246, 0.3)' }}>
+            <h2 style={{ margin: '0 0 10px 0' }}>Party Created!</h2>
+            <p style={{ color: '#cbd5e1', marginBottom: '20px' }}>Share this code with your friends to watch together.</p>
+            <div style={{ backgroundColor: '#1e293b', padding: '20px', borderRadius: '8px', fontSize: '2rem', fontWeight: '900', letterSpacing: '4px', color: '#8b5cf6', marginBottom: '20px' }}>
+              {generatedPartyCode}
+            </div>
+            <button onClick={() => setGeneratedPartyCode(null)} style={{ backgroundColor: '#8b5cf6', color: '#fff', border: 'none', padding: '12px 30px', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 'bold', cursor: 'pointer', width: '100%' }}>Close & Watch</button>
+          </div>
+        </div>
+      )}
+
       {/* --- DESKTOP HEADER --- */}
       <header className="header-nav">
         
-        {/* LOGO & NAV LINKS (LEFT) */}
         <div className="header-left">
           <div onClick={() => handleNavClick('Home', 'movie')} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', cursor: 'pointer' }}>
             <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: '900', letterSpacing: '1px', color: '#fff', lineHeight: 1 }}>
               SOKO<span style={{color: '#ef4444'}}>FLIX</span>
             </h1>
-            {/* UPDATED: Deeper blue and perfectly left aligned */}
             <div style={{ fontSize: '0.8rem', color: '#2563eb', marginTop: '2px', fontWeight: 'bold', alignSelf: 'flex-start' }}>
               by soko ecom
             </div>
@@ -392,19 +462,25 @@ export default function App() {
             <div className={`nav-item ${currentTab === 'TV Shows' ? 'active' : ''}`} onClick={() => handleNavClick('TV Shows', 'tv')}>{Icons.TV} TV Shows</div>
             <div className={`nav-item ${currentTab === 'Anime' ? 'active' : ''}`} onClick={() => handleNavClick('Anime')}>{Icons.Anime} Anime</div>
             <div className={`nav-item ${currentTab === 'Watch Later' ? 'active' : ''}`} onClick={() => handleNavClick('Watch Later')}>{Icons.Library} Watch Later</div>
+            <div className={`nav-item ${currentTab === 'Parties' ? 'active' : ''}`} onClick={() => handleNavClick('Parties')}>{Icons.Parties} Parties</div>
           </div>
         </div>
 
-        {/* SEARCH & PROFILE (RIGHT) */}
         <div className="header-right">
           <div className="search-btn" onClick={() => { setIsSearchActive(!isSearchActive); setCurrentTab('Search'); }}>
             {Icons.Search}
           </div>
           
           {user ? (
-            <img src={user.photoURL} alt="Profile" className="user-avatar" onClick={handleAuth} title="My Account" />
+            user.photoURL ? (
+              <img src={user.photoURL} alt="Profile" className="user-avatar" onClick={() => setCurrentTab('Account')} title="My Account" />
+            ) : (
+              <div className="user-avatar" onClick={() => setCurrentTab('Account')} title="My Account">
+                {user.email.charAt(0).toUpperCase()}
+              </div>
+            )
           ) : (
-            <button className="auth-btn" onClick={handleAuth}>
+            <button className="auth-btn" onClick={() => setShowAuthModal(true)}>
               Sign In
             </button>
           )}
@@ -427,15 +503,41 @@ export default function App() {
       )}
 
       {/* --- DYNAMIC MAIN CONTENT --- */}
-      {currentTab === 'Parties' ? renderPlaceholder('Watch Parties') :
+      {/* NEW: WATCH PARTIES VIEW */}
+      {currentTab === 'Parties' ? (
+         <div className="browse-container" style={{ padding: '40px 20px', maxWidth: '800px', margin: '0 auto', minHeight: '60vh', textAlign: 'center' }}>
+           <h2 style={{ fontSize: '2.5rem', marginBottom: '20px', fontWeight: '900' }}>Watch Parties</h2>
+           <p style={{ color: '#cbd5e1', marginBottom: '40px', fontSize: '1.1rem' }}>Watch movies and shows in sync with your friends. Chat in real-time while you stream.</p>
+ 
+           <div style={{ backgroundColor: '#1e293b', padding: '40px 20px', borderRadius: '12px', marginBottom: '30px' }}>
+             <h3 style={{ margin: '0 0 10px 0' }}>Join a Party</h3>
+             <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '20px' }}>Enter the 6-digit code shared by your friend.</p>
+             <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+               <input type="text" placeholder="Enter Code" value={partyCode} onChange={e => setPartyCode(e.target.value.toUpperCase())} maxLength={6} style={{ padding: '12px 20px', borderRadius: '8px', border: '1px solid #334155', backgroundColor: '#0f172a', color: '#fff', outline: 'none', textTransform: 'uppercase', width: '150px', textAlign: 'center', fontWeight: 'bold', fontSize: '1.2rem' }} />
+               <button className="auth-btn" style={{ backgroundColor: '#8b5cf6' }} onClick={() => alert("Party connection via Firestore coming next update!")}>Join</button>
+             </div>
+           </div>
+ 
+           <div style={{ backgroundColor: '#1e293b', padding: '40px 20px', borderRadius: '12px' }}>
+             <h3 style={{ margin: '0 0 10px 0' }}>Host a Party</h3>
+             <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '20px' }}>To start a party, search for a movie and click the "Host Party" button on its page.</p>
+             <button className="auth-btn" style={{ margin: '0 auto', backgroundColor: '#3b82f6' }} onClick={() => handleNavClick('Home', 'movie')}>Browse to Host</button>
+           </div>
+         </div>
+       ) :
        
-       /* ACCOUNT SETTINGS VIEW */
        currentTab === 'Account' ? (
          <div className="static-page" style={{ textAlign: 'center' }}>
            {user ? (
              <>
-               <img src={user.photoURL} alt="Profile" style={{ width: '100px', height: '100px', borderRadius: '50%', border: '4px solid #ef4444', marginBottom: '20px', objectFit: 'cover' }} />
-               <h1>Welcome, {user.displayName}</h1>
+               {user.photoURL ? (
+                 <img src={user.photoURL} alt="Profile" style={{ width: '100px', height: '100px', borderRadius: '50%', border: '4px solid #ef4444', marginBottom: '20px', objectFit: 'cover' }} />
+               ) : (
+                 <div style={{ width: '100px', height: '100px', borderRadius: '50%', border: '4px solid #ef4444', marginBottom: '20px', backgroundColor: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '3rem', margin: '0 auto 20px auto', fontWeight: 'bold' }}>
+                   {user.email.charAt(0).toUpperCase()}
+                 </div>
+               )}
+               <h1>Welcome back</h1>
                <p style={{ fontSize: '1.2rem', color: '#94a3b8' }}>{user.email}</p>
                
                <div style={{ backgroundColor: '#1e293b', padding: '30px', borderRadius: '12px', margin: '40px 0', textAlign: 'left' }}>
@@ -456,7 +558,6 @@ export default function App() {
          </div>
        ) :
 
-       /* STATIC PAGES */
        currentTab === 'About' ? (
          <div className="static-page">
            <h1>About Us</h1>
@@ -481,7 +582,7 @@ export default function App() {
            <h1>Privacy Policy</h1>
            <p>Last updated: 2026</p>
            <h2>1. Information We Collect</h2>
-           <p>When you use Google Sign-In, we collect your basic profile information (name, email address, and profile picture) to create your account and manage your Watch Later library. We do not sell or share this data with third parties.</p>
+           <p>When you sign up, we collect your basic profile information (email address and profile picture) to create your account and manage your Watch Later library. We do not sell or share this data with third parties.</p>
            <h2>2. Cookies and Tracking</h2>
            <p>SOKOFLIX uses local storage and basic cookies to keep you logged in and to save your UI preferences.</p>
            <h2>3. Third-Party Links</h2>
@@ -495,19 +596,18 @@ export default function App() {
            <h2>Content Disclaimer</h2>
            <p>SOKOFLIX acts as a search engine and aggregator. All movie and TV show data is provided by the TMDB API. Video content is embedded from third-party sources. SOKOFLIX does not host, upload, or control any of the video files streamed on this platform.</p>
            <h2>User Accounts</h2>
-           <p>You are responsible for maintaining the security of your Google account. SOKOFLIX reserves the right to terminate accounts that violate our community guidelines.</p>
+           <p>You are responsible for maintaining the security of your account. SOKOFLIX reserves the right to terminate accounts that violate our community guidelines.</p>
          </div>
        ) :
 
-       /* WATCH LATER VIEW */
        currentTab === 'Watch Later' ? (
          <div className="browse-container" style={{ padding: '40px 60px', maxWidth: '1600px', margin: '0 auto', minHeight: '60vh' }}>
           <h2 style={{ fontSize: '2.5rem', marginBottom: '30px', fontWeight: '900' }}>Watch Later</h2>
           {!user ? (
             <div style={{ textAlign: 'center', padding: '60px', backgroundColor: '#1e293b', borderRadius: '12px' }}>
               <h3>Please Sign In</h3>
-              <p style={{ color: '#94a3b8', marginBottom: '20px' }}>You need to connect your Google account to save your favorite movies and shows.</p>
-              <button className="auth-btn" style={{ margin: '0 auto' }} onClick={handleAuth}>Sign In with Google</button>
+              <p style={{ color: '#94a3b8', marginBottom: '20px' }}>You need to connect your account to save your favorite movies and shows.</p>
+              <button className="auth-btn" style={{ margin: '0 auto' }} onClick={() => setShowAuthModal(true)}>Sign In</button>
             </div>
           ) : myLibrary.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px', color: '#64748b' }}>
@@ -517,7 +617,6 @@ export default function App() {
             </div>
           ) : (
             <>
-              {/* Movies Section */}
               {myLibrary.filter(item => item.media_type === 'movie').length > 0 && (
                 <div style={{ marginBottom: '50px' }}>
                   <h3 style={{ fontSize: '1.5rem', marginBottom: '20px', borderBottom: '1px solid #334155', paddingBottom: '10px' }}>Saved Movies</h3>
@@ -529,7 +628,6 @@ export default function App() {
                 </div>
               )}
               
-              {/* TV Series Section */}
               {myLibrary.filter(item => item.media_type === 'tv').length > 0 && (
                 <div>
                   <h3 style={{ fontSize: '1.5rem', marginBottom: '20px', borderBottom: '1px solid #334155', paddingBottom: '10px' }}>Saved Series & Anime</h3>
@@ -577,21 +675,28 @@ export default function App() {
             <img src={`https://image.tmdb.org/t/p/w300${activeItem.poster_path}`} alt="poster" style={{ borderRadius: '8px', width: '220px', border: '1px solid #1e293b', boxShadow: '0 4px 15px rgba(0,0,0,0.5)' }} />
             <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
               
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '15px' }}>
                 <h2 style={{ fontSize: '2.5rem', margin: '0 0 8px 0', fontWeight: 'bold' }}>{getTitle(activeItem)}</h2>
                 
-                {/* Save button explicitly calls toggleLibrary with activeItem */}
-                <button onClick={() => toggleLibrary(activeItem)} style={{ backgroundColor: checkInLibrary(activeItem.id) ? '#22c55e' : '#1e293b', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background 0.2s' }}>
-                  {checkInLibrary(activeItem.id) ? (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                  ) : (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
-                  )}
-                  <span className="mobile-hide" style={{ fontWeight: 'bold' }}>{checkInLibrary(activeItem.id) ? 'Saved' : 'Save'}</span>
-                </button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  {/* NEW: Host Party Button */}
+                  <button onClick={hostParty} style={{ backgroundColor: '#8b5cf6', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background 0.2s' }}>
+                    {Icons.Parties}
+                    <span className="mobile-hide" style={{ fontWeight: 'bold' }}>Host Party</span>
+                  </button>
+
+                  <button onClick={() => toggleLibrary(activeItem)} style={{ backgroundColor: checkInLibrary(activeItem.id) ? '#22c55e' : '#1e293b', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background 0.2s' }}>
+                    {checkInLibrary(activeItem.id) ? (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    ) : (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                    )}
+                    <span className="mobile-hide" style={{ fontWeight: 'bold' }}>{checkInLibrary(activeItem.id) ? 'Saved' : 'Save'}</span>
+                  </button>
+                </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#cbd5e1', fontSize: '1rem', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#cbd5e1', fontSize: '1rem', marginBottom: '10px', marginTop: '10px' }}>
                 <span>{getYear(activeItem)}</span>
                 {itemDetails?.runtime > 0 && <><span>•</span><span>{Math.floor(itemDetails.runtime / 60)}h {itemDetails.runtime % 60}m</span></>}
                 {itemDetails?.episode_run_time?.[0] > 0 && <><span>•</span><span>{itemDetails.episode_run_time[0]}m</span></>}
@@ -642,6 +747,13 @@ export default function App() {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* NEW: RECOMMENDATIONS UI */}
+              {recommendations && recommendations.length > 0 && (
+                <div style={{ marginTop: '50px' }}>
+                  <MovieRow title="More Like This" items={recommendations} onClickItem={setActiveItem} mediaType={mediaType} />
                 </div>
               )}
 
@@ -769,7 +881,6 @@ export default function App() {
                     <div className="hero-buttons" style={{ display: 'flex', gap: '15px' }}>
                       <button className="watch-now-btn" onClick={() => setActiveItem(heroItem)} style={{ backgroundColor: '#dc2626', color: '#fff', border: 'none', padding: '12px 30px', fontSize: '1.1rem', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s' }}>Watch Now</button>
                       
-                      {/* NEW: Explicitly passing heroItem to toggleLibrary */}
                       <button className="watchlist-btn" onClick={() => toggleLibrary(heroItem)} style={{ backgroundColor: '#1e293b', color: '#fff', border: 'none', padding: '12px 25px', fontSize: '1.1rem', fontWeight: 'bold', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                         {checkInLibrary(heroItem?.id) ? (
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
