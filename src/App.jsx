@@ -6,7 +6,7 @@ import { collection, addDoc, getDocs, query, deleteDoc, doc, setDoc, getDoc, upd
 const TMDB_API_KEY = import.meta.env.VITE_TMDB_API_KEY;
 const BASE_URL = 'https://api.themoviedb.org/3';
 
-// --- HOISTED HELPER FUNCTIONS ---
+// --- SAFE HOISTED FUNCTIONS ---
 function getTitle(item) { return item?.title || item?.name; }
 function getDate(item) { return item?.release_date || item?.first_air_date; }
 function getYear(item) { return getDate(item)?.substring(0, 4) || 'N/A'; }
@@ -19,24 +19,28 @@ function getRatingColor(rating) {
 const currentYear = 2026;
 const YEARS = Array.from(new Array(40), (val, index) => currentYear - index);
 
-// --- SVG ICONS ---
-const Icons = {
-  Home: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>,
-  Movies: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>,
-  TV: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>,
-  Anime: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>,
-  Parties: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>,
-  Library: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>,
-  Search: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>,
-  FilterGenre: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>,
-  FilterLang: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>,
-  FilterYear: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>,
-  FilterRating: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>,
-  FilterClear: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>,
-  FilterSort: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
-};
+// --- FIX: PROPER ICON COMPONENT TO PREVENT BUNDLER CRASH ---
+function Icon({ name }) {
+  switch(name) {
+    case 'Home': return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>;
+    case 'Movies': return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="2" y1="7" x2="7" y2="7"></line><line x1="2" y1="17" x2="7" y2="17"></line><line x1="17" y1="17" x2="22" y2="17"></line><line x1="17" y1="7" x2="22" y2="7"></line></svg>;
+    case 'TV': return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>;
+    case 'Anime': return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>;
+    case 'Parties': return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>;
+    case 'Library': return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>;
+    case 'Watch Later': return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>;
+    case 'Search': return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>;
+    case 'FilterGenre': return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>;
+    case 'FilterLang': return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>;
+    case 'FilterYear': return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>;
+    case 'FilterRating': return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>;
+    case 'FilterClear': return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>;
+    case 'FilterSort': return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>;
+    default: return null;
+  }
+}
 
-// --- COMPONENTS MOVED TO THE TOP TO PREVENT VITE CRASH ---
+// --- MAIN COMPONENTS MOVED TO THE TOP TO PREVENT VITE CRASH ---
 function MovieCard({ item, onClick, mediaType, isGrid }) {
   const ratingScore = Math.round(item.vote_average * 10);
   return (
@@ -414,7 +418,7 @@ export default function App() {
 
   const renderPlaceholder = (title) => (
     <div style={{ height: '60vh', display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', color: '#64748b' }}>
-      {Icons[title]}
+      <Icon name={title} />
       <h2 style={{ marginTop: '20px', color: '#fff' }}>{title}</h2>
       <p>This feature is coming soon to SOKOFLIX.</p>
     </div>
@@ -597,18 +601,18 @@ export default function App() {
           </div>
 
           <div className="nav-links">
-            <div className={`nav-item ${currentTab === 'Home' ? 'active' : ''}`} onClick={() => handleNavClick('Home', 'movie')}>{Icons.Home} Home</div>
-            <div className={`nav-item ${currentTab === 'Movies' ? 'active' : ''}`} onClick={() => handleNavClick('Movies', 'movie')}>{Icons.Movies} Movies</div>
-            <div className={`nav-item ${currentTab === 'TV Shows' ? 'active' : ''}`} onClick={() => handleNavClick('TV Shows', 'tv')}>{Icons.TV} TV Shows</div>
-            <div className={`nav-item ${currentTab === 'Anime' ? 'active' : ''}`} onClick={() => handleNavClick('Anime')}>{Icons.Anime} Anime</div>
-            <div className={`nav-item ${currentTab === 'Watch Later' ? 'active' : ''}`} onClick={() => handleNavClick('Watch Later')}>{Icons.Library} Watch Later</div>
-            <div className={`nav-item ${currentTab === 'Parties' ? 'active' : ''}`} onClick={() => handleNavClick('Parties')}>{Icons.Parties} Parties</div>
+            <div className={`nav-item ${currentTab === 'Home' ? 'active' : ''}`} onClick={() => handleNavClick('Home', 'movie')}><Icon name="Home" /> Home</div>
+            <div className={`nav-item ${currentTab === 'Movies' ? 'active' : ''}`} onClick={() => handleNavClick('Movies', 'movie')}><Icon name="Movies" /> Movies</div>
+            <div className={`nav-item ${currentTab === 'TV Shows' ? 'active' : ''}`} onClick={() => handleNavClick('TV Shows', 'tv')}><Icon name="TV" /> TV Shows</div>
+            <div className={`nav-item ${currentTab === 'Anime' ? 'active' : ''}`} onClick={() => handleNavClick('Anime')}><Icon name="Anime" /> Anime</div>
+            <div className={`nav-item ${currentTab === 'Watch Later' ? 'active' : ''}`} onClick={() => handleNavClick('Watch Later')}><Icon name="Library" /> Watch Later</div>
+            <div className={`nav-item ${currentTab === 'Parties' ? 'active' : ''}`} onClick={() => handleNavClick('Parties')}><Icon name="Parties" /> Parties</div>
           </div>
         </div>
 
         <div className="header-right">
           <div className="search-btn" onClick={() => { setIsSearchActive(!isSearchActive); setCurrentTab('Search'); }}>
-            {Icons.Search}
+            <Icon name="Search" />
           </div>
           
           {user ? (
@@ -750,7 +754,7 @@ export default function App() {
             </div>
           ) : myLibrary.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px', color: '#64748b' }}>
-              {Icons.Library}
+              <Icon name="Library" />
               <h3 style={{ marginTop: '20px' }}>Your list is empty</h3>
               <p>Add movies and shows by clicking the save icon on their page.</p>
             </div>
@@ -831,7 +835,7 @@ export default function App() {
                         </button>
                       ) : (
                         <button onClick={hostParty} style={{ backgroundColor: '#8b5cf6', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background 0.2s' }}>
-                          {Icons.Parties}
+                          <Icon name="Parties" />
                           <span className="mobile-hide" style={{ fontWeight: 'bold' }}>Host Party</span>
                         </button>
                       )}
@@ -967,7 +971,7 @@ export default function App() {
           <div className="browse-filter-bar">
             
             <div className="filter-wrapper">
-              <span className="filter-icon">{Icons.FilterGenre}</span>
+              <span className="filter-icon"><Icon name="FilterGenre" /></span>
               <select className="browse-filter-select" value={filterGenre} onChange={e => setFilterGenre(e.target.value)}>
                 <option value="">All Genres</option>
                 {availableGenres.map(genre => (
@@ -977,7 +981,7 @@ export default function App() {
             </div>
             
             <div className="filter-wrapper">
-              <span className="filter-icon">{Icons.FilterLang}</span>
+              <span className="filter-icon"><Icon name="FilterLang" /></span>
               <select className="browse-filter-select" value={filterLang} onChange={e => setFilterLang(e.target.value)}>
                 <option value="">All Languages</option>
                 <option value="en">English</option>
@@ -989,7 +993,7 @@ export default function App() {
             </div>
             
             <div className="filter-wrapper">
-              <span className="filter-icon">{Icons.FilterYear}</span>
+              <span className="filter-icon"><Icon name="FilterYear" /></span>
               <select className="browse-filter-select" value={filterYear} onChange={e => setFilterYear(e.target.value)}>
                 <option value="">All Years</option>
                 {YEARS.map(year => (
@@ -999,7 +1003,7 @@ export default function App() {
             </div>
             
             <div className="filter-wrapper">
-              <span className="filter-icon">{Icons.FilterRating}</span>
+              <span className="filter-icon"><Icon name="FilterRating" /></span>
               <select className="browse-filter-select" value={filterRating} onChange={e => setFilterRating(e.target.value)}>
                 <option value="">Any Rating</option>
                 <option value="9">9.0+ Stars</option>
@@ -1012,12 +1016,12 @@ export default function App() {
 
             {(filterGenre || filterLang || filterYear || filterRating || filterSort !== 'popularity.desc') && (
               <button className="clear-filters-btn" onClick={resetFilters}>
-                {Icons.FilterClear} Clear
+                <Icon name="FilterClear" /> Clear
               </button>
             )}
             
             <div className="filter-wrapper sort-filter" style={{ marginLeft: 'auto' }}>
-              <span className="filter-icon">{Icons.FilterSort}</span>
+              <span className="filter-icon"><Icon name="FilterSort" /></span>
               <select className="browse-filter-select" value={filterSort} onChange={e => setFilterSort(e.target.value)}>
                 <option value="popularity.desc">Popularity (High to Low)</option>
                 <option value="popularity.asc">Popularity (Low to High)</option>
@@ -1129,22 +1133,22 @@ export default function App() {
       {/* --- REWIRED MOBILE BOTTOM NAV --- */}
       <nav className="mobile-bottom-nav">
         <div className={`mob-nav-item ${currentTab === 'Home' ? 'active' : ''}`} onClick={() => handleNavClick('Home', 'movie')}>
-          {Icons.Home} <span>Home</span>
+          <Icon name="Home" /> <span>Home</span>
         </div>
         <div className={`mob-nav-item ${currentTab === 'Movies' ? 'active' : ''}`} onClick={() => handleNavClick('Movies', 'movie')}>
-          {Icons.Movies} <span>Movies</span>
+          <Icon name="Movies" /> <span>Movies</span>
         </div>
         <div className={`mob-nav-item ${currentTab === 'TV Shows' ? 'active' : ''}`} onClick={() => handleNavClick('TV Shows', 'tv')}>
-          {Icons.TV} <span>TV</span>
+          <Icon name="TV" /> <span>TV</span>
         </div>
         <div className={`mob-nav-item ${currentTab === 'Anime' ? 'active' : ''}`} onClick={() => handleNavClick('Anime')}>
-          {Icons.Anime} <span>Anime</span>
+          <Icon name="Anime" /> <span>Anime</span>
         </div>
         <div className={`mob-nav-item ${currentTab === 'Watch Later' ? 'active' : ''}`} onClick={() => handleNavClick('Watch Later')}>
-          {Icons.Library} <span>Later</span>
+          <Icon name="Library" /> <span>Later</span>
         </div>
         <div className={`mob-nav-item ${currentTab === 'Parties' ? 'active' : ''}`} onClick={() => handleNavClick('Parties')}>
-          {Icons.Parties} <span>Parties</span>
+          <Icon name="Parties" /> <span>Parties</span>
         </div>
       </nav>
 
