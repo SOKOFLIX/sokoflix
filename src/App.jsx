@@ -77,6 +77,9 @@ function MovieRow({ title, items, onClickItem, mediaType, isLive }) {
 
 // --- MAIN APP ---
 export default function App() {
+  // ==========================================
+  // 1. ALL STATE DECLARATIONS AT THE EXACT TOP
+  // ==========================================
   const [trendingDay, setTrendingDay] = useState([]);
   const [trendingWeek, setTrendingWeek] = useState([]);
   const [newest, setNewest] = useState([]);
@@ -99,7 +102,6 @@ export default function App() {
   const [filterRating, setFilterRating] = useState('');
   const [filterSort, setFilterSort] = useState('popularity.desc');
 
-  // Firebase Auth, Library & Recommendations State
   const [user, setUser] = useState(null);
   const [myLibrary, setMyLibrary] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
@@ -109,7 +111,6 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   
-  // PARTY SYSTEM STATES
   const [partyCode, setPartyCode] = useState('');
   const [generatedPartyCode, setGeneratedPartyCode] = useState(null);
   const [currentPartyCode, setCurrentPartyCode] = useState(null);
@@ -117,6 +118,27 @@ export default function App() {
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
+
+  // FIX: These were at the bottom, causing the crash! Now they are safe.
+  const [season, setSeason] = useState(1);
+  const [episode, setEpisode] = useState(1);
+  const [itemDetails, setItemDetails] = useState(null);
+  const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
+  const [heroLogo, setHeroLogo] = useState(null);
+
+  // ==========================================
+  // 2. DERIVED VARIABLES
+  // ==========================================
+  const heroItem = trendingDay[heroIndex];
+  const availableSeasons = itemDetails?.seasons?.filter(s => s.season_number > 0) || [];
+  const selectedSeasonData = availableSeasons.find(s => s.season_number === season);
+  const episodeCount = selectedSeasonData?.episode_count || 1;
+
+  // ==========================================
+  // 3. FUNCTIONS
+  // ==========================================
+  const nextHero = () => setHeroIndex((prev) => (prev + 1) % Math.min(trendingDay.length, 5));
+  const prevHero = () => setHeroIndex((prev) => (prev === 0 ? Math.min(trendingDay.length, 5) - 1 : prev - 1));
 
   function fetchLibrary(uid) {
     try {
@@ -132,15 +154,6 @@ export default function App() {
       console.error("Error fetching library:", error);
     }
   }
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) fetchLibrary(currentUser.uid);
-      else setMyLibrary([]);
-    });
-    return () => unsubscribe();
-  }, []);
 
   function handleEmailAuth(e) {
     e.preventDefault();
@@ -245,47 +258,6 @@ export default function App() {
     }).catch(err => console.error("Error joining party:", err));
   }
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  useEffect(() => {
-    if (!currentPartyCode) return;
-
-    const unsubParty = onSnapshot(doc(db, "parties", currentPartyCode), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setPartyData(data);
-        
-        if (user && data.hostId !== user.uid) {
-          if (data.season && data.season !== season) setSeason(data.season);
-          if (data.episode && data.episode !== episode) setEpisode(data.episode);
-        }
-      }
-    });
-
-    const q = query(collection(db, "parties", currentPartyCode, "messages"), orderBy("createdAt", "asc"));
-    const unsubChat = onSnapshot(q, (snapshot) => {
-      const msgs = [];
-      snapshot.forEach(doc => msgs.push({ id: doc.id, ...doc.data() }));
-      setMessages(msgs);
-    });
-
-    return () => {
-      unsubParty();
-      unsubChat();
-    };
-  }, [currentPartyCode, user]);
-
-  useEffect(() => {
-    if (currentPartyCode && partyData && user && partyData.hostId === user.uid) {
-       updateDoc(doc(db, "parties", currentPartyCode), {
-          season: season,
-          episode: episode
-       }).catch(err => console.error(err));
-    }
-  }, [season, episode]);
-
   function sendChatMessage(e) {
     e.preventDefault();
     if (!newMessage.trim() || !currentPartyCode) return;
@@ -332,6 +304,59 @@ export default function App() {
     }
   }
 
+  // ==========================================
+  // 4. ALL EFFECTS (LISTENERS)
+  // ==========================================
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) fetchLibrary(currentUser.uid);
+      else setMyLibrary([]);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  useEffect(() => {
+    if (!currentPartyCode) return;
+
+    const unsubParty = onSnapshot(doc(db, "parties", currentPartyCode), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setPartyData(data);
+        
+        if (user && data.hostId !== user.uid) {
+          if (data.season && data.season !== season) setSeason(data.season);
+          if (data.episode && data.episode !== episode) setEpisode(data.episode);
+        }
+      }
+    });
+
+    const q = query(collection(db, "parties", currentPartyCode, "messages"), orderBy("createdAt", "asc"));
+    const unsubChat = onSnapshot(q, (snapshot) => {
+      const msgs = [];
+      snapshot.forEach(doc => msgs.push({ id: doc.id, ...doc.data() }));
+      setMessages(msgs);
+    });
+
+    return () => {
+      unsubParty();
+      unsubChat();
+    };
+  }, [currentPartyCode, user]); // SAFE: currentPartyCode is declared at top
+
+  useEffect(() => {
+    if (currentPartyCode && partyData && user && partyData.hostId === user.uid) {
+       updateDoc(doc(db, "parties", currentPartyCode), {
+          season: season,
+          episode: episode
+       }).catch(err => console.error(err));
+    }
+  }, [season, episode]); // SAFE: season and episode are declared at top
+
   useEffect(() => {
     setSeason(1); setEpisode(1); setItemDetails(null); setIsOverviewExpanded(false); setRecommendations([]);
     if (activeItem) {
@@ -341,14 +366,14 @@ export default function App() {
       fetch(`${BASE_URL}/${mediaType}/${activeItem.id}/recommendations?api_key=${TMDB_API_KEY}`)
         .then(res => res.json()).then(data => setRecommendations(data.results || []));
     }
-  }, [activeItem, mediaType]);
+  }, [activeItem, mediaType]); // SAFE: activeItem is declared at top
 
   useEffect(() => {
     fetch(`${BASE_URL}/genre/${mediaType}/list?api_key=${TMDB_API_KEY}`)
       .then(res => res.json())
       .then(data => setAvailableGenres(data.genres || []))
       .catch(err => console.error("Error fetching genres:", err));
-  }, [mediaType]);
+  }, [mediaType]); // SAFE: mediaType is declared at top
 
   useEffect(() => {
     if (currentTab === 'Home') {
@@ -362,7 +387,7 @@ export default function App() {
         setNewest(newRes.results || []);
       }).catch(err => console.error("API Error:", err));
     }
-  }, [mediaType, currentTab]);
+  }, [mediaType, currentTab]); // SAFE: currentTab is declared at top
 
   useEffect(() => {
     if (currentTab === 'Movies' || currentTab === 'TV Shows' || currentTab === 'Anime') {
@@ -378,24 +403,14 @@ export default function App() {
         .then(data => setBrowseItems(data.results || []))
         .catch(err => console.error("API Error:", err));
     }
-  }, [currentTab, mediaType, filterGenre, filterLang, filterYear, filterRating, filterSort]);
+  }, [currentTab, mediaType, filterGenre, filterLang, filterYear, filterRating, filterSort]); // SAFE
 
   useEffect(() => {
     if (searchQuery.length > 2) {
       fetch(`${BASE_URL}/search/${mediaType}?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(searchQuery)}`)
         .then(res => res.json()).then(data => setSearchResults(data.results || []));
     } else { setSearchResults([]); }
-  }, [searchQuery, mediaType]);
-
-  const heroItem = trendingDay[heroIndex];
-  const nextHero = () => setHeroIndex((prev) => (prev + 1) % Math.min(trendingDay.length, 5));
-  const prevHero = () => setHeroIndex((prev) => (prev === 0 ? Math.min(trendingDay.length, 5) - 1 : prev - 1));
-
-  const [season, setSeason] = useState(1);
-  const [episode, setEpisode] = useState(1);
-  const [itemDetails, setItemDetails] = useState(null);
-  const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
-  const [heroLogo, setHeroLogo] = useState(null);
+  }, [searchQuery, mediaType]); // SAFE
 
   useEffect(() => {
     if (heroItem && currentTab === 'Home') {
@@ -411,12 +426,11 @@ export default function App() {
         })
         .catch(err => console.error("Error fetching logo:", err));
     }
-  }, [heroItem, mediaType, currentTab]);
+  }, [heroItem, mediaType, currentTab]); // SAFE: heroItem is derived above
 
-  const availableSeasons = itemDetails?.seasons?.filter(s => s.season_number > 0) || [];
-  const selectedSeasonData = availableSeasons.find(s => s.season_number === season);
-  const episodeCount = selectedSeasonData?.episode_count || 1;
-
+  // ==========================================
+  // 5. RENDER UI
+  // ==========================================
   const renderPlaceholder = (title) => (
     <div style={{ height: '60vh', display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', color: '#64748b' }}>
       <Icon name={title} />
@@ -789,7 +803,7 @@ export default function App() {
        
        activeItem ? (
         
-        /* --- PLAYER VIEW --- */
+        /* --- PLAYER VIEW (WITH SPLIT PARTY WRAPPER) --- */
         <div className="player-container" style={{ paddingTop: '40px', width: '100%', maxWidth: '1600px', margin: '0 auto', padding: '40px 40px 40px 40px' }}>
           <button onClick={() => { setActiveItem(null); setCurrentPartyCode(null); }} style={{ padding: '10px 20px', marginBottom: '20px', cursor: 'pointer', backgroundColor: '#1e293b', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>← Back</button>
           
