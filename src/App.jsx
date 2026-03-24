@@ -415,6 +415,14 @@ export default function App() {
     }
   }, [heroItem, mediaType, currentTab]);
 
+  const renderPlaceholder = (title) => (
+    <div style={{ height: '60vh', display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', color: '#64748b' }}>
+      <Icon name={title} />
+      <h2 style={{ marginTop: '20px', color: '#fff' }}>{title}</h2>
+      <p>This feature is coming soon to SOKOFLIX.</p>
+    </div>
+  );
+
   return (
     <div style={{ backgroundColor: '#060913', color: '#fff', minHeight: '100vh', fontFamily: 'Helvetica, Arial, sans-serif', paddingBottom: '100px', overflowX: 'hidden' }}>
       
@@ -473,7 +481,7 @@ export default function App() {
         .static-page h2 { color: #fff; margin-top: 30px; margin-bottom: 10px; }
         .static-page p { margin-bottom: 20px; }
 
-        .player-wrapper { display: flex; gap: 30px; align-items: flex-start; width: 100%; max-width: 100%; }
+        .player-wrapper { display: flex; gap: 30px; align-items: flex-start; width: 100%; }
         
         /* STRICT 16:9 IFRAME CONTAINMENT */
         .iframe-container { width: 100%; aspect-ratio: 16 / 9; background-color: #000; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.8); }
@@ -516,8 +524,7 @@ export default function App() {
           .player-meta img { width: 120px !important; }
           .mobile-hide { display: none !important; }
 
-          /* FIX: FORCED WIDTH LIMITS ON MOBILE PLAYER CONTAINER */
-          .player-container { padding: 15px !important; margin-top: 10px; width: 100% !important; max-width: 100vw !important; box-sizing: border-box !important; overflow-x: hidden !important; }
+          .player-container { padding: 15px !important; margin-top: 10px; width: 100vw !important; max-width: 100vw !important; box-sizing: border-box !important; overflow-x: hidden !important; }
           .player-wrapper { flex-direction: column; gap: 20px; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; }
           .iframe-container { border-radius: 8px; width: 100% !important; max-width: 100% !important; aspect-ratio: 16 / 9 !important; height: auto !important; padding: 0 !important; }
 
@@ -530,7 +537,7 @@ export default function App() {
           .filter-wrapper.sort-filter { margin-left: 0 !important; }
           .clear-filters-btn { width: 100%; justify-content: center; }
 
-          .chat-sidebar { width: 100% !important; height: 450px; margin-bottom: 20px; }
+          .chat-sidebar { width: 100% !important; height: 450px; margin-bottom: 20px; flex-shrink: 1 !important; }
         }
       `}</style>
 
@@ -651,8 +658,8 @@ export default function App() {
           
           <div className="player-wrapper">
             
-            {/* LEFT COLUMN: THE MOVIE & META */}
-            <div style={{ flex: 1, minWidth: 0, width: '100%', maxWidth: '100%' }}>
+            {/* FIX: Removed hardcoded 100% width so it doesn't push the chat box out of the way! */}
+            <div className="player-left" style={{ flex: 1, minWidth: 0 }}>
               
               <div className="iframe-container">
                 <iframe src={mediaType === 'movie' ? `https://vidsrc.net/embed/movie/${activeItem.id}` : `https://vidsrc.net/embed/tv?tmdb=${activeItem.id}&season=${season}&episode=${episode}`} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allowFullScreen></iframe>
@@ -774,7 +781,8 @@ export default function App() {
 
             {/* RIGHT COLUMN: REAL-TIME CHAT UI */}
             {currentPartyCode && (
-              <div className="chat-sidebar" style={{ width: '350px', backgroundColor: '#0f172a', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+              /* FIX: Added flexShrink: 0 so the video player can never squish the chat! */
+              <div className="chat-sidebar" style={{ width: '350px', flexShrink: 0, backgroundColor: '#0f172a', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
                 
                 {/* Chat Header */}
                 <div style={{ padding: '15px 20px', backgroundColor: '#1e293b', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #334155' }}>
@@ -1146,6 +1154,42 @@ export default function App() {
         </div>
       </nav>
 
+    </div>
+  );
+}
+
+// --- REUSABLE COMPONENTS ---
+function MovieRow({ title, items, onClickItem, mediaType, isLive }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div style={{ marginBottom: '40px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px' }}>
+        <h3 style={{ fontSize: '1.5rem', margin: 0 }}>{title}</h3>
+        {isLive && <span style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', border: '1px solid #ef4444' }}>Live</span>}
+      </div>
+      <div className="hide-scroll" style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '15px' }}>
+        {items.filter(i => i.poster_path).map(item => (
+          <MovieCard key={item.id} item={item} onClick={() => onClickItem(item)} mediaType={mediaType} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MovieCard({ item, onClick, mediaType, isGrid }) {
+  const ratingScore = Math.round(item.vote_average * 10);
+  return (
+    <div className="movie-card" onClick={onClick} style={{ minWidth: isGrid ? '0' : '160px', width: isGrid ? '100%' : '160px', position: 'relative', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer', backgroundColor: '#1e293b' }}>
+      <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={getTitle(item)} style={{ width: '100%', height: isGrid ? 'auto' : '240px', aspectRatio: isGrid ? '2/3' : 'auto', objectFit: 'cover', display: 'block' }} />
+      <div className="mobile-hide" style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '60%', background: 'linear-gradient(0deg, rgba(0,0,0,0.95) 0%, transparent 100%)' }}></div>
+      <div style={{ position: 'absolute', top: '8px', left: '8px', backgroundColor: '#3b82f6', color: '#fff', padding: '3px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '900' }}>✦ NEW</div>
+      <div style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: getRatingColor(item.vote_average), color: '#fff', padding: '3px 6px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '900' }}>★ {ratingScore}%</div>
+      <div className="mobile-hide" style={{ position: 'absolute', bottom: '12px', left: '12px', right: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '6px', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 'bold' }}>
+          <span>{getYear(item)}</span>
+          <span style={{ textTransform: 'capitalize' }}>{mediaType}</span>
+        </div>
+      </div>
     </div>
   );
 }
