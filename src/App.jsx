@@ -415,14 +415,6 @@ export default function App() {
     }
   }, [heroItem, mediaType, currentTab]);
 
-  const renderPlaceholder = (title) => (
-    <div style={{ height: '60vh', display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', color: '#64748b' }}>
-      <Icon name={title} />
-      <h2 style={{ marginTop: '20px', color: '#fff' }}>{title}</h2>
-      <p>This feature is coming soon to SOKOFLIX.</p>
-    </div>
-  );
-
   return (
     <div style={{ backgroundColor: '#060913', color: '#fff', minHeight: '100vh', fontFamily: 'Helvetica, Arial, sans-serif', paddingBottom: '100px', overflowX: 'hidden' }}>
       
@@ -481,7 +473,7 @@ export default function App() {
         .static-page h2 { color: #fff; margin-top: 30px; margin-bottom: 10px; }
         .static-page p { margin-bottom: 20px; }
 
-        .player-wrapper { display: flex; gap: 30px; align-items: flex-start; width: 100%; }
+        .player-wrapper { display: flex; gap: 30px; align-items: flex-start; width: 100%; max-width: 100%; }
         
         /* STRICT 16:9 IFRAME CONTAINMENT */
         .iframe-container { width: 100%; aspect-ratio: 16 / 9; background-color: #000; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.8); }
@@ -524,6 +516,7 @@ export default function App() {
           .player-meta img { width: 120px !important; }
           .mobile-hide { display: none !important; }
 
+          /* FIX: FORCED WIDTH LIMITS ON MOBILE PLAYER CONTAINER */
           .player-container { padding: 15px !important; margin-top: 10px; width: 100vw !important; max-width: 100vw !important; box-sizing: border-box !important; overflow-x: hidden !important; }
           .player-wrapper { flex-direction: column; gap: 20px; width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; }
           .iframe-container { border-radius: 8px; width: 100% !important; max-width: 100% !important; aspect-ratio: 16 / 9 !important; height: auto !important; padding: 0 !important; }
@@ -658,8 +651,8 @@ export default function App() {
           
           <div className="player-wrapper">
             
-            {/* FIX: Removed hardcoded 100% width so it doesn't push the chat box out of the way! */}
-            <div className="player-left" style={{ flex: 1, minWidth: 0 }}>
+            {/* LEFT COLUMN: THE MOVIE & META */}
+            <div style={{ flex: 1, minWidth: 0, width: '100%', maxWidth: '100%' }}>
               
               <div className="iframe-container">
                 <iframe src={mediaType === 'movie' ? `https://vidsrc.net/embed/movie/${activeItem.id}` : `https://vidsrc.net/embed/tv?tmdb=${activeItem.id}&season=${season}&episode=${episode}`} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allowFullScreen></iframe>
@@ -781,7 +774,6 @@ export default function App() {
 
             {/* RIGHT COLUMN: REAL-TIME CHAT UI */}
             {currentPartyCode && (
-              /* FIX: Added flexShrink: 0 so the video player can never squish the chat! */
               <div className="chat-sidebar" style={{ width: '350px', flexShrink: 0, backgroundColor: '#0f172a', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
                 
                 {/* Chat Header */}
