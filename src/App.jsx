@@ -145,6 +145,15 @@ export default function App() {
     }
   }
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) fetchLibrary(currentUser.uid);
+      else setMyLibrary([]);
+    });
+    return () => unsubscribe();
+  }, []);
+
   function handleEmailAuth(e) {
     e.preventDefault();
     try {
@@ -295,15 +304,6 @@ export default function App() {
   }
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) fetchLibrary(currentUser.uid);
-      else setMyLibrary([]);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
@@ -415,14 +415,6 @@ export default function App() {
     }
   }, [heroItem, mediaType, currentTab]);
 
-  const renderPlaceholder = (title) => (
-    <div style={{ height: '60vh', display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', color: '#64748b' }}>
-      <Icon name={title} />
-      <h2 style={{ marginTop: '20px', color: '#fff' }}>{title}</h2>
-      <p>This feature is coming soon to SOKOFLIX.</p>
-    </div>
-  );
-
   return (
     <div style={{ backgroundColor: '#060913', color: '#fff', minHeight: '100vh', fontFamily: 'Helvetica, Arial, sans-serif', paddingBottom: '100px', overflowX: 'hidden' }}>
       
@@ -483,7 +475,7 @@ export default function App() {
 
         .player-wrapper { display: flex; gap: 30px; align-items: flex-start; }
         
-        /* MODERN 16:9 FIX: Prevents infinite vertical stretching on mobile */
+        /* 16:9 Aspect Ratio container for iframe */
         .iframe-container { position: relative; width: 100%; aspect-ratio: 16 / 9; background-color: #000; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.8); }
 
         @media (max-width: 900px) {
@@ -649,8 +641,9 @@ export default function App() {
 
       {/* --- DYNAMIC MAIN CONTENT --- */}
       
-      {/* FIX: MOVED ACTIVE ITEM RENDER TO THE TOP OF THE TERNARY CHAIN!
-        Now, clicking a movie will instantly open the player, even if you are on the Watch Later tab.
+      {/* CRITICAL FIX: 
+        activeItem is checked FIRST. This guarantees that clicking any movie (even from Watch Later) 
+        will overlay the Player Screen immediately. 
       */}
       {activeItem ? (
         
@@ -1155,42 +1148,6 @@ export default function App() {
         </div>
       </nav>
 
-    </div>
-  );
-}
-
-// --- REUSABLE COMPONENTS ---
-function MovieRow({ title, items, onClickItem, mediaType, isLive }) {
-  if (!items || items.length === 0) return null;
-  return (
-    <div style={{ marginBottom: '40px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px' }}>
-        <h3 style={{ fontSize: '1.5rem', margin: 0 }}>{title}</h3>
-        {isLive && <span style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', border: '1px solid #ef4444' }}>Live</span>}
-      </div>
-      <div className="hide-scroll" style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '15px' }}>
-        {items.filter(i => i.poster_path).map(item => (
-          <MovieCard key={item.id} item={item} onClick={() => onClickItem(item)} mediaType={mediaType} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MovieCard({ item, onClick, mediaType, isGrid }) {
-  const ratingScore = Math.round(item.vote_average * 10);
-  return (
-    <div className="movie-card" onClick={onClick} style={{ minWidth: isGrid ? '0' : '160px', width: isGrid ? '100%' : '160px', position: 'relative', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer', backgroundColor: '#1e293b' }}>
-      <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={getTitle(item)} style={{ width: '100%', height: isGrid ? 'auto' : '240px', aspectRatio: isGrid ? '2/3' : 'auto', objectFit: 'cover', display: 'block' }} />
-      <div className="mobile-hide" style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '60%', background: 'linear-gradient(0deg, rgba(0,0,0,0.95) 0%, transparent 100%)' }}></div>
-      <div style={{ position: 'absolute', top: '8px', left: '8px', backgroundColor: '#3b82f6', color: '#fff', padding: '3px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '900' }}>✦ NEW</div>
-      <div style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: getRatingColor(item.vote_average), color: '#fff', padding: '3px 6px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '900' }}>★ {ratingScore}%</div>
-      <div className="mobile-hide" style={{ position: 'absolute', bottom: '12px', left: '12px', right: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: '6px', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 'bold' }}>
-          <span>{getYear(item)}</span>
-          <span style={{ textTransform: 'capitalize' }}>{mediaType}</span>
-        </div>
-      </div>
     </div>
   );
 }
