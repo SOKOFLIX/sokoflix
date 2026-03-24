@@ -77,9 +77,6 @@ function MovieRow({ title, items, onClickItem, mediaType, isLive }) {
 
 // --- MAIN APP ---
 export default function App() {
-  // ==========================================
-  // 1. ALL STATE DECLARATIONS AT THE EXACT TOP
-  // ==========================================
   const [trendingDay, setTrendingDay] = useState([]);
   const [trendingWeek, setTrendingWeek] = useState([]);
   const [newest, setNewest] = useState([]);
@@ -119,24 +116,17 @@ export default function App() {
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef(null);
 
-  // FIX: These were at the bottom, causing the crash! Now they are safe.
   const [season, setSeason] = useState(1);
   const [episode, setEpisode] = useState(1);
   const [itemDetails, setItemDetails] = useState(null);
   const [isOverviewExpanded, setIsOverviewExpanded] = useState(false);
   const [heroLogo, setHeroLogo] = useState(null);
 
-  // ==========================================
-  // 2. DERIVED VARIABLES
-  // ==========================================
   const heroItem = trendingDay[heroIndex];
   const availableSeasons = itemDetails?.seasons?.filter(s => s.season_number > 0) || [];
   const selectedSeasonData = availableSeasons.find(s => s.season_number === season);
   const episodeCount = selectedSeasonData?.episode_count || 1;
 
-  // ==========================================
-  // 3. FUNCTIONS
-  // ==========================================
   const nextHero = () => setHeroIndex((prev) => (prev + 1) % Math.min(trendingDay.length, 5));
   const prevHero = () => setHeroIndex((prev) => (prev === 0 ? Math.min(trendingDay.length, 5) - 1 : prev - 1));
 
@@ -304,9 +294,6 @@ export default function App() {
     }
   }
 
-  // ==========================================
-  // 4. ALL EFFECTS (LISTENERS)
-  // ==========================================
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -346,7 +333,7 @@ export default function App() {
       unsubParty();
       unsubChat();
     };
-  }, [currentPartyCode, user]); // SAFE: currentPartyCode is declared at top
+  }, [currentPartyCode, user]);
 
   useEffect(() => {
     if (currentPartyCode && partyData && user && partyData.hostId === user.uid) {
@@ -355,7 +342,7 @@ export default function App() {
           episode: episode
        }).catch(err => console.error(err));
     }
-  }, [season, episode]); // SAFE: season and episode are declared at top
+  }, [season, episode]);
 
   useEffect(() => {
     setSeason(1); setEpisode(1); setItemDetails(null); setIsOverviewExpanded(false); setRecommendations([]);
@@ -366,14 +353,14 @@ export default function App() {
       fetch(`${BASE_URL}/${mediaType}/${activeItem.id}/recommendations?api_key=${TMDB_API_KEY}`)
         .then(res => res.json()).then(data => setRecommendations(data.results || []));
     }
-  }, [activeItem, mediaType]); // SAFE: activeItem is declared at top
+  }, [activeItem, mediaType]);
 
   useEffect(() => {
     fetch(`${BASE_URL}/genre/${mediaType}/list?api_key=${TMDB_API_KEY}`)
       .then(res => res.json())
       .then(data => setAvailableGenres(data.genres || []))
       .catch(err => console.error("Error fetching genres:", err));
-  }, [mediaType]); // SAFE: mediaType is declared at top
+  }, [mediaType]);
 
   useEffect(() => {
     if (currentTab === 'Home') {
@@ -387,7 +374,7 @@ export default function App() {
         setNewest(newRes.results || []);
       }).catch(err => console.error("API Error:", err));
     }
-  }, [mediaType, currentTab]); // SAFE: currentTab is declared at top
+  }, [mediaType, currentTab]);
 
   useEffect(() => {
     if (currentTab === 'Movies' || currentTab === 'TV Shows' || currentTab === 'Anime') {
@@ -403,14 +390,14 @@ export default function App() {
         .then(data => setBrowseItems(data.results || []))
         .catch(err => console.error("API Error:", err));
     }
-  }, [currentTab, mediaType, filterGenre, filterLang, filterYear, filterRating, filterSort]); // SAFE
+  }, [currentTab, mediaType, filterGenre, filterLang, filterYear, filterRating, filterSort]);
 
   useEffect(() => {
     if (searchQuery.length > 2) {
       fetch(`${BASE_URL}/search/${mediaType}?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(searchQuery)}`)
         .then(res => res.json()).then(data => setSearchResults(data.results || []));
     } else { setSearchResults([]); }
-  }, [searchQuery, mediaType]); // SAFE
+  }, [searchQuery, mediaType]);
 
   useEffect(() => {
     if (heroItem && currentTab === 'Home') {
@@ -426,11 +413,8 @@ export default function App() {
         })
         .catch(err => console.error("Error fetching logo:", err));
     }
-  }, [heroItem, mediaType, currentTab]); // SAFE: heroItem is derived above
+  }, [heroItem, mediaType, currentTab]);
 
-  // ==========================================
-  // 5. RENDER UI
-  // ==========================================
   const renderPlaceholder = (title) => (
     <div style={{ height: '60vh', display: 'flex', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', color: '#64748b' }}>
       <Icon name={title} />
@@ -498,7 +482,9 @@ export default function App() {
         .static-page p { margin-bottom: 20px; }
 
         .player-wrapper { display: flex; gap: 30px; align-items: flex-start; }
-        .iframe-container { position: relative; width: 100%; padding-top: 56.25%; background-color: #000; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.8); }
+        
+        /* MODERN 16:9 FIX: Prevents infinite vertical stretching on mobile */
+        .iframe-container { position: relative; width: 100%; aspect-ratio: 16 / 9; background-color: #000; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.8); }
 
         @media (max-width: 900px) {
           .nav-links { display: none; }
@@ -662,7 +648,187 @@ export default function App() {
       )}
 
       {/* --- DYNAMIC MAIN CONTENT --- */}
-      {currentTab === 'Parties' ? (
+      
+      {/* FIX: MOVED ACTIVE ITEM RENDER TO THE TOP OF THE TERNARY CHAIN!
+        Now, clicking a movie will instantly open the player, even if you are on the Watch Later tab.
+      */}
+      {activeItem ? (
+        
+        /* --- PLAYER VIEW (WITH SPLIT PARTY WRAPPER) --- */
+        <div className="player-container" style={{ paddingTop: '40px', width: '100%', maxWidth: '1600px', margin: '0 auto', padding: '40px 40px 40px 40px' }}>
+          <button onClick={() => { setActiveItem(null); setCurrentPartyCode(null); }} style={{ padding: '10px 20px', marginBottom: '20px', cursor: 'pointer', backgroundColor: '#1e293b', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>← Back</button>
+          
+          <div className="player-wrapper">
+            
+            {/* LEFT COLUMN: THE MOVIE & META */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              
+              <div className="iframe-container">
+                <iframe src={mediaType === 'movie' ? `https://vidsrc.net/embed/movie/${activeItem.id}` : `https://vidsrc.net/embed/tv?tmdb=${activeItem.id}&season=${season}&episode=${episode}`} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allowFullScreen></iframe>
+              </div>
+
+              {mediaType === 'tv' && itemDetails && (
+                <div style={{ display: 'flex', gap: '20px', padding: '20px', backgroundColor: '#1e293b', borderRadius: '12px', marginTop: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#94a3b8' }}>Season</span>
+                    <select value={season} onChange={(e) => { setSeason(Number(e.target.value)); setEpisode(1); }} style={{ padding: '10px 35px 10px 15px', borderRadius: '8px', backgroundColor: '#0f172a', color: '#fff', border: '1px solid #334155', fontSize: '1.1rem', outline: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
+                      {availableSeasons.map(s => <option key={s.id} value={s.season_number}>Season {s.season_number}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ width: '2px', backgroundColor: '#334155' }}></div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#94a3b8' }}>Episode</span>
+                    <select value={episode} onChange={(e) => setEpisode(Number(e.target.value))} style={{ padding: '10px 35px 10px 15px', borderRadius: '8px', backgroundColor: '#0f172a', color: '#fff', border: '1px solid #334155', fontSize: '1.1rem', outline: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
+                      {[...Array(episodeCount)].map((_, i) => <option key={i + 1} value={i + 1}>Episode {i + 1}</option>)}
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              <div className="player-meta" style={{ marginTop: '40px', display: 'flex', gap: '30px', alignItems: 'flex-start' }}>
+                <img src={`https://image.tmdb.org/t/p/w300${activeItem.poster_path}`} alt="poster" style={{ borderRadius: '8px', width: '220px', border: '1px solid #1e293b', boxShadow: '0 4px 15px rgba(0,0,0,0.5)' }} />
+                <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '15px' }}>
+                    <h2 style={{ fontSize: '2.5rem', margin: '0 0 8px 0', fontWeight: 'bold' }}>{getTitle(activeItem)}</h2>
+                    
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      
+                      {currentPartyCode ? (
+                        <button onClick={() => setCurrentPartyCode(null)} style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background 0.2s' }}>
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                          <span className="mobile-hide" style={{ fontWeight: 'bold' }}>Leave Party</span>
+                        </button>
+                      ) : (
+                        <button onClick={hostParty} style={{ backgroundColor: '#8b5cf6', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background 0.2s' }}>
+                          <Icon name="Parties" />
+                          <span className="mobile-hide" style={{ fontWeight: 'bold' }}>Host Party</span>
+                        </button>
+                      )}
+
+                      <button onClick={() => toggleLibrary(activeItem)} style={{ backgroundColor: checkInLibrary(activeItem.id) ? '#22c55e' : '#1e293b', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background 0.2s' }}>
+                        {checkInLibrary(activeItem.id) ? (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        ) : (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
+                        )}
+                        <span className="mobile-hide" style={{ fontWeight: 'bold' }}>{checkInLibrary(activeItem.id) ? 'Saved' : 'Save'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#cbd5e1', fontSize: '1rem', marginBottom: '10px', marginTop: '10px' }}>
+                    <span>{getYear(activeItem)}</span>
+                    {itemDetails?.runtime > 0 && <><span>•</span><span>{Math.floor(itemDetails.runtime / 60)}h {itemDetails.runtime % 60}m</span></>}
+                    {itemDetails?.episode_run_time?.[0] > 0 && <><span>•</span><span>{itemDetails.episode_run_time[0]}m</span></>}
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1rem', marginBottom: '15px' }}>
+                    <span style={{ color: '#eab308' }}>★</span>
+                    <span style={{ fontWeight: 'bold' }}>{(activeItem.vote_average || 0).toFixed(1)}</span>
+                    <span style={{ color: '#64748b' }}>({itemDetails?.vote_count || activeItem.vote_count})</span>
+                  </div>
+
+                  {itemDetails?.genres && (
+                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '25px' }}>
+                      {itemDetails.genres.map(g => <span key={g.id} style={{ backgroundColor: '#1e293b', color: '#cbd5e1', padding: '4px 12px', borderRadius: '16px', fontSize: '0.85rem' }}>{g.name}</span>)}
+                    </div>
+                  )}
+
+                  <h3 style={{ fontSize: '1.1rem', marginBottom: '8px', fontWeight: 'bold' }}>Overview</h3>
+                  <p style={{ color: '#cbd5e1', fontSize: '1rem', lineHeight: '1.6', maxWidth: '800px', margin: 0 }}>
+                    {isOverviewExpanded || activeItem.overview.length < 120 ? activeItem.overview : `${activeItem.overview.substring(0, 120)}...`}
+                  </p>
+                  {activeItem.overview.length >= 120 && (
+                    <button onClick={() => setIsOverviewExpanded(!isOverviewExpanded)} style={{ background: 'none', border: 'none', color: '#3b82f6', padding: 0, marginTop: '8px', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold' }}>
+                      {isOverviewExpanded ? 'Show Less' : 'Read More'}
+                    </button>
+                  )}
+
+                  {/* CAST UI */}
+                  {itemDetails?.credits?.cast && itemDetails.credits.cast.length > 0 && (
+                    <div style={{ marginTop: '30px' }}>
+                      <h3 style={{ fontSize: '1.1rem', marginBottom: '12px', fontWeight: 'bold' }}>Top Cast</h3>
+                      <div className="hide-scroll" style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px', width: '100%' }}>
+                        {itemDetails.credits.cast.slice(0, 8).map(actor => (
+                          <div key={actor.id} style={{ minWidth: '90px', width: '90px', textAlign: 'center', flexShrink: 0 }}>
+                            {actor.profile_path ? (
+                              <img 
+                                src={`https://image.tmdb.org/t/p/w185${actor.profile_path}`} 
+                                alt={actor.name} 
+                                style={{ width: '75px', height: '75px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #334155', margin: '0 auto 8px auto', display: 'block', flexShrink: 0 }} 
+                              />
+                            ) : (
+                              <div style={{ width: '75px', height: '75px', borderRadius: '50%', backgroundColor: '#1e293b', border: '2px solid #334155', margin: '0 auto 8px auto', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', flexShrink: 0 }}>
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                              </div>
+                            )}
+                            <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#cbd5e1', lineHeight: '1.2', marginBottom: '4px' }}>{actor.name}</div>
+                            <div style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.2' }}>{actor.character}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* RECOMMENDATIONS UI */}
+                  {recommendations && recommendations.length > 0 && (
+                    <div style={{ marginTop: '50px' }}>
+                      <MovieRow title="More Like This" items={recommendations} onClickItem={setActiveItem} mediaType={mediaType} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: REAL-TIME CHAT UI */}
+            {currentPartyCode && (
+              <div className="chat-sidebar" style={{ width: '350px', backgroundColor: '#0f172a', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
+                
+                {/* Chat Header */}
+                <div style={{ padding: '15px 20px', backgroundColor: '#1e293b', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #334155' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ width: '8px', height: '8px', backgroundColor: '#22c55e', borderRadius: '50%', boxShadow: '0 0 10px #22c55e' }}></div>
+                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold' }}>Live Chat</h3>
+                  </div>
+                  <span style={{ backgroundColor: '#8b5cf6', color: '#fff', padding: '4px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', letterSpacing: '1px' }}>{currentPartyCode}</span>
+                </div>
+                
+                {/* Messages Area */}
+                <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px', minHeight: '400px' }}>
+                  
+                  <div style={{ alignSelf: 'center', backgroundColor: '#1e293b', padding: '6px 16px', borderRadius: '20px', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>
+                    Room Created
+                  </div>
+                  
+                  {messages.map(msg => {
+                    const isMe = msg.userId === user?.uid;
+                    return (
+                      <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                        <span style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '4px', margin: isMe ? '0 5px 0 0' : '0 0 0 5px' }}>{isMe ? 'You' : msg.userName}</span>
+                        <div style={{ backgroundColor: isMe ? '#2563eb' : '#1e293b', color: isMe ? '#fff' : '#e2e8f0', padding: '10px 15px', borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px', fontSize: '0.95rem', maxWidth: '85%', lineHeight: '1.4', wordBreak: 'break-word' }}>
+                          {msg.text}
+                        </div>
+                      </div>
+                    )
+                  })}
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Chat Input Form */}
+                <form onSubmit={sendChatMessage} style={{ padding: '15px', borderTop: '1px solid #1e293b', display: 'flex', gap: '10px', backgroundColor: '#0b101e' }}>
+                  <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Type a message..." style={{ flex: 1, padding: '12px 15px', borderRadius: '20px', border: '1px solid #334155', backgroundColor: '#1e293b', color: '#fff', outline: 'none', fontSize: '0.95rem' }} />
+                  <button type="submit" style={{ backgroundColor: '#8b5cf6', color: '#fff', border: 'none', width: '42px', height: '42px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', transition: 'transform 0.2s' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                  </button>
+                </form>
+
+              </div>
+            )}
+          </div>
+        </div>
+
+      ) : currentTab === 'Parties' ? (
          <div className="browse-container" style={{ padding: '40px 20px', maxWidth: '800px', margin: '0 auto', minHeight: '60vh', textAlign: 'center' }}>
            <h2 style={{ fontSize: '2.5rem', marginBottom: '20px', fontWeight: '900' }}>Watch Parties</h2>
            <p style={{ color: '#cbd5e1', marginBottom: '40px', fontSize: '1.1rem' }}>Watch movies and shows in sync with your friends. Chat in real-time while you stream.</p>
@@ -799,185 +965,7 @@ export default function App() {
             </>
           )}
          </div>
-       ) :
-       
-       activeItem ? (
-        
-        /* --- PLAYER VIEW (WITH SPLIT PARTY WRAPPER) --- */
-        <div className="player-container" style={{ paddingTop: '40px', width: '100%', maxWidth: '1600px', margin: '0 auto', padding: '40px 40px 40px 40px' }}>
-          <button onClick={() => { setActiveItem(null); setCurrentPartyCode(null); }} style={{ padding: '10px 20px', marginBottom: '20px', cursor: 'pointer', backgroundColor: '#1e293b', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>← Back</button>
-          
-          <div className="player-wrapper">
-            
-            {/* LEFT COLUMN: THE MOVIE & META */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              
-              <div className="iframe-container">
-                <iframe src={mediaType === 'movie' ? `https://vidsrc.net/embed/movie/${activeItem.id}` : `https://vidsrc.net/embed/tv?tmdb=${activeItem.id}&season=${season}&episode=${episode}`} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allowFullScreen></iframe>
-              </div>
-
-              {mediaType === 'tv' && itemDetails && (
-                <div style={{ display: 'flex', gap: '20px', padding: '20px', backgroundColor: '#1e293b', borderRadius: '12px', marginTop: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#94a3b8' }}>Season</span>
-                    <select value={season} onChange={(e) => { setSeason(Number(e.target.value)); setEpisode(1); }} style={{ padding: '10px 35px 10px 15px', borderRadius: '8px', backgroundColor: '#0f172a', color: '#fff', border: '1px solid #334155', fontSize: '1.1rem', outline: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
-                      {availableSeasons.map(s => <option key={s.id} value={s.season_number}>Season {s.season_number}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ width: '2px', backgroundColor: '#334155' }}></div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#94a3b8' }}>Episode</span>
-                    <select value={episode} onChange={(e) => setEpisode(Number(e.target.value))} style={{ padding: '10px 35px 10px 15px', borderRadius: '8px', backgroundColor: '#0f172a', color: '#fff', border: '1px solid #334155', fontSize: '1.1rem', outline: 'none', cursor: 'pointer', fontWeight: 'bold' }}>
-                      {[...Array(episodeCount)].map((_, i) => <option key={i + 1} value={i + 1}>Episode {i + 1}</option>)}
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              <div className="player-meta" style={{ marginTop: '40px', display: 'flex', gap: '30px', alignItems: 'flex-start' }}>
-                <img src={`https://image.tmdb.org/t/p/w300${activeItem.poster_path}`} alt="poster" style={{ borderRadius: '8px', width: '220px', border: '1px solid #1e293b', boxShadow: '0 4px 15px rgba(0,0,0,0.5)' }} />
-                <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
-                  
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '15px' }}>
-                    <h2 style={{ fontSize: '2.5rem', margin: '0 0 8px 0', fontWeight: 'bold' }}>{getTitle(activeItem)}</h2>
-                    
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                      
-                      {currentPartyCode ? (
-                        <button onClick={() => setCurrentPartyCode(null)} style={{ backgroundColor: '#ef4444', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background 0.2s' }}>
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
-                          <span className="mobile-hide" style={{ fontWeight: 'bold' }}>Leave Party</span>
-                        </button>
-                      ) : (
-                        <button onClick={hostParty} style={{ backgroundColor: '#8b5cf6', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background 0.2s' }}>
-                          <Icon name="Parties" />
-                          <span className="mobile-hide" style={{ fontWeight: 'bold' }}>Host Party</span>
-                        </button>
-                      )}
-
-                      <button onClick={() => toggleLibrary(activeItem)} style={{ backgroundColor: checkInLibrary(activeItem.id) ? '#22c55e' : '#1e293b', color: '#fff', border: 'none', padding: '12px', borderRadius: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', transition: 'background 0.2s' }}>
-                        {checkInLibrary(activeItem.id) ? (
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                        ) : (
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path></svg>
-                        )}
-                        <span className="mobile-hide" style={{ fontWeight: 'bold' }}>{checkInLibrary(activeItem.id) ? 'Saved' : 'Save'}</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#cbd5e1', fontSize: '1rem', marginBottom: '10px', marginTop: '10px' }}>
-                    <span>{getYear(activeItem)}</span>
-                    {itemDetails?.runtime > 0 && <><span>•</span><span>{Math.floor(itemDetails.runtime / 60)}h {itemDetails.runtime % 60}m</span></>}
-                    {itemDetails?.episode_run_time?.[0] > 0 && <><span>•</span><span>{itemDetails.episode_run_time[0]}m</span></>}
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '1rem', marginBottom: '15px' }}>
-                    <span style={{ color: '#eab308' }}>★</span>
-                    <span style={{ fontWeight: 'bold' }}>{(activeItem.vote_average || 0).toFixed(1)}</span>
-                    <span style={{ color: '#64748b' }}>({itemDetails?.vote_count || activeItem.vote_count})</span>
-                  </div>
-
-                  {itemDetails?.genres && (
-                    <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '25px' }}>
-                      {itemDetails.genres.map(g => <span key={g.id} style={{ backgroundColor: '#1e293b', color: '#cbd5e1', padding: '4px 12px', borderRadius: '16px', fontSize: '0.85rem' }}>{g.name}</span>)}
-                    </div>
-                  )}
-
-                  <h3 style={{ fontSize: '1.1rem', marginBottom: '8px', fontWeight: 'bold' }}>Overview</h3>
-                  <p style={{ color: '#cbd5e1', fontSize: '1rem', lineHeight: '1.6', maxWidth: '800px', margin: 0 }}>
-                    {isOverviewExpanded || activeItem.overview.length < 120 ? activeItem.overview : `${activeItem.overview.substring(0, 120)}...`}
-                  </p>
-                  {activeItem.overview.length >= 120 && (
-                    <button onClick={() => setIsOverviewExpanded(!isOverviewExpanded)} style={{ background: 'none', border: 'none', color: '#3b82f6', padding: 0, marginTop: '8px', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold' }}>
-                      {isOverviewExpanded ? 'Show Less' : 'Read More'}
-                    </button>
-                  )}
-
-                  {/* CAST UI */}
-                  {itemDetails?.credits?.cast && itemDetails.credits.cast.length > 0 && (
-                    <div style={{ marginTop: '30px' }}>
-                      <h3 style={{ fontSize: '1.1rem', marginBottom: '12px', fontWeight: 'bold' }}>Top Cast</h3>
-                      <div className="hide-scroll" style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '10px', width: '100%' }}>
-                        {itemDetails.credits.cast.slice(0, 8).map(actor => (
-                          <div key={actor.id} style={{ minWidth: '90px', width: '90px', textAlign: 'center', flexShrink: 0 }}>
-                            {actor.profile_path ? (
-                              <img 
-                                src={`https://image.tmdb.org/t/p/w185${actor.profile_path}`} 
-                                alt={actor.name} 
-                                style={{ width: '75px', height: '75px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #334155', margin: '0 auto 8px auto', display: 'block', flexShrink: 0 }} 
-                              />
-                            ) : (
-                              <div style={{ width: '75px', height: '75px', borderRadius: '50%', backgroundColor: '#1e293b', border: '2px solid #334155', margin: '0 auto 8px auto', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', flexShrink: 0 }}>
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                              </div>
-                            )}
-                            <div style={{ fontSize: '0.8rem', fontWeight: 'bold', color: '#cbd5e1', lineHeight: '1.2', marginBottom: '4px' }}>{actor.name}</div>
-                            <div style={{ fontSize: '0.7rem', color: '#64748b', lineHeight: '1.2' }}>{actor.character}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* RECOMMENDATIONS UI */}
-                  {recommendations && recommendations.length > 0 && (
-                    <div style={{ marginTop: '50px' }}>
-                      <MovieRow title="More Like This" items={recommendations} onClickItem={setActiveItem} mediaType={mediaType} />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* RIGHT COLUMN: REAL-TIME CHAT UI */}
-            {currentPartyCode && (
-              <div className="chat-sidebar" style={{ width: '350px', backgroundColor: '#0f172a', borderRadius: '16px', border: '1px solid #1e293b', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
-                
-                {/* Chat Header */}
-                <div style={{ padding: '15px 20px', backgroundColor: '#1e293b', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #334155' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ width: '8px', height: '8px', backgroundColor: '#22c55e', borderRadius: '50%', boxShadow: '0 0 10px #22c55e' }}></div>
-                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold' }}>Live Chat</h3>
-                  </div>
-                  <span style={{ backgroundColor: '#8b5cf6', color: '#fff', padding: '4px 10px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: 'bold', letterSpacing: '1px' }}>{currentPartyCode}</span>
-                </div>
-                
-                {/* Messages Area */}
-                <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '15px', minHeight: '400px' }}>
-                  
-                  <div style={{ alignSelf: 'center', backgroundColor: '#1e293b', padding: '6px 16px', borderRadius: '20px', fontSize: '0.75rem', color: '#94a3b8', fontWeight: 'bold' }}>
-                    Room Created
-                  </div>
-                  
-                  {messages.map(msg => {
-                    const isMe = msg.userId === user?.uid;
-                    return (
-                      <div key={msg.id} style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
-                        <span style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '4px', margin: isMe ? '0 5px 0 0' : '0 0 0 5px' }}>{isMe ? 'You' : msg.userName}</span>
-                        <div style={{ backgroundColor: isMe ? '#2563eb' : '#1e293b', color: isMe ? '#fff' : '#e2e8f0', padding: '10px 15px', borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px', fontSize: '0.95rem', maxWidth: '85%', lineHeight: '1.4', wordBreak: 'break-word' }}>
-                          {msg.text}
-                        </div>
-                      </div>
-                    )
-                  })}
-                  <div ref={messagesEndRef} />
-                </div>
-
-                {/* Chat Input Form */}
-                <form onSubmit={sendChatMessage} style={{ padding: '15px', borderTop: '1px solid #1e293b', display: 'flex', gap: '10px', backgroundColor: '#0b101e' }}>
-                  <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Type a message..." style={{ flex: 1, padding: '12px 15px', borderRadius: '20px', border: '1px solid #334155', backgroundColor: '#1e293b', color: '#fff', outline: 'none', fontSize: '0.95rem' }} />
-                  <button type="submit" style={{ backgroundColor: '#8b5cf6', color: '#fff', border: 'none', width: '42px', height: '42px', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', transition: 'transform 0.2s' }}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
-                  </button>
-                </form>
-
-              </div>
-            )}
-          </div>
-        </div>
-
-      ) : currentTab === 'Movies' || currentTab === 'TV Shows' || currentTab === 'Anime' ? (
+       ) : currentTab === 'Movies' || currentTab === 'TV Shows' || currentTab === 'Anime' ? (
         
         /* --- DEDICATED BROWSE VIEW (Movies, TV, and Anime) --- */
         <div className="browse-container" style={{ padding: '40px 60px', maxWidth: '1600px', margin: '0 auto' }}>
@@ -1167,6 +1155,42 @@ export default function App() {
         </div>
       </nav>
 
+    </div>
+  );
+}
+
+// --- REUSABLE COMPONENTS ---
+function MovieRow({ title, items, onClickItem, mediaType, isLive }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div style={{ marginBottom: '40px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px' }}>
+        <h3 style={{ fontSize: '1.5rem', margin: 0 }}>{title}</h3>
+        {isLive && <span style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', border: '1px solid #ef4444' }}>Live</span>}
+      </div>
+      <div className="hide-scroll" style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '15px' }}>
+        {items.filter(i => i.poster_path).map(item => (
+          <MovieCard key={item.id} item={item} onClick={() => onClickItem(item)} mediaType={mediaType} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MovieCard({ item, onClick, mediaType, isGrid }) {
+  const ratingScore = Math.round(item.vote_average * 10);
+  return (
+    <div className="movie-card" onClick={onClick} style={{ minWidth: isGrid ? '0' : '160px', width: isGrid ? '100%' : '160px', position: 'relative', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer', backgroundColor: '#1e293b' }}>
+      <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={getTitle(item)} style={{ width: '100%', height: isGrid ? 'auto' : '240px', aspectRatio: isGrid ? '2/3' : 'auto', objectFit: 'cover', display: 'block' }} />
+      <div className="mobile-hide" style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '60%', background: 'linear-gradient(0deg, rgba(0,0,0,0.95) 0%, transparent 100%)' }}></div>
+      <div style={{ position: 'absolute', top: '8px', left: '8px', backgroundColor: '#3b82f6', color: '#fff', padding: '3px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '900' }}>✦ NEW</div>
+      <div style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: getRatingColor(item.vote_average), color: '#fff', padding: '3px 6px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '900' }}>★ {ratingScore}%</div>
+      <div className="mobile-hide" style={{ position: 'absolute', bottom: '12px', left: '12px', right: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '6px', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 'bold' }}>
+          <span>{getYear(item)}</span>
+          <span style={{ textTransform: 'capitalize' }}>{mediaType}</span>
+        </div>
+      </div>
     </div>
   );
 }
