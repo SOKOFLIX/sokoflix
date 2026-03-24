@@ -475,8 +475,8 @@ export default function App() {
 
         .player-wrapper { display: flex; gap: 30px; align-items: flex-start; }
         
-        /* 16:9 Aspect Ratio container for iframe */
-        .iframe-container { position: relative; width: 100%; aspect-ratio: 16 / 9; background-color: #000; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.8); }
+        /* STRICT 16:9 IFRAME CONTAINMENT */
+        .iframe-container { position: relative; width: 100%; padding-top: 56.25%; background-color: #000; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.8); }
 
         @media (max-width: 900px) {
           .nav-links { display: none; }
@@ -515,10 +515,12 @@ export default function App() {
           .player-meta img { width: 120px !important; }
           .mobile-hide { display: none !important; }
 
-          .player-container { padding: 15px 15px !important; margin-top: 10px; }
-          .iframe-container { border-radius: 8px; }
+          /* FIX: FORCED WIDTH LIMITS ON MOBILE PLAYER CONTAINER */
+          .player-container { padding: 15px !important; margin-top: 10px; width: 100vw !important; max-width: 100vw !important; box-sizing: border-box !important; overflow-x: hidden !important; }
+          .player-wrapper { flex-direction: column; gap: 20px; width: 100% !important; max-width: 100% !important; }
+          .iframe-container { border-radius: 8px; width: 100% !important; max-width: 100% !important; }
+
           .section-padding { padding: 0 20px !important; margin-top: 60px !important; position: relative; z-index: 10; }
-          
           .browse-container { padding: 40px 15px 120px 15px !important; } 
           .footer { flex-direction: column; padding: 40px 20px; }
 
@@ -527,7 +529,6 @@ export default function App() {
           .filter-wrapper.sort-filter { margin-left: 0 !important; }
           .clear-filters-btn { width: 100%; justify-content: center; }
 
-          .player-wrapper { flex-direction: column; gap: 20px; }
           .chat-sidebar { width: 100% !important; height: 450px; margin-bottom: 20px; }
         }
       `}</style>
@@ -594,25 +595,25 @@ export default function App() {
           </div>
 
           <div className="nav-links">
-            <div className={`nav-item ${currentTab === 'Home' ? 'active' : ''}`} onClick={() => handleNavClick('Home', 'movie')}><Icon name="Home" /> Home</div>
-            <div className={`nav-item ${currentTab === 'Movies' ? 'active' : ''}`} onClick={() => handleNavClick('Movies', 'movie')}><Icon name="Movies" /> Movies</div>
-            <div className={`nav-item ${currentTab === 'TV Shows' ? 'active' : ''}`} onClick={() => handleNavClick('TV Shows', 'tv')}><Icon name="TV" /> TV Shows</div>
-            <div className={`nav-item ${currentTab === 'Anime' ? 'active' : ''}`} onClick={() => handleNavClick('Anime')}><Icon name="Anime" /> Anime</div>
-            <div className={`nav-item ${currentTab === 'Watch Later' ? 'active' : ''}`} onClick={() => handleNavClick('Watch Later')}><Icon name="Library" /> Watch Later</div>
-            <div className={`nav-item ${currentTab === 'Parties' ? 'active' : ''}`} onClick={() => handleNavClick('Parties')}><Icon name="Parties" /> Parties</div>
+            <div className={`nav-item ${currentTab === 'Home' && !activeItem ? 'active' : ''}`} onClick={() => handleNavClick('Home', 'movie')}><Icon name="Home" /> Home</div>
+            <div className={`nav-item ${currentTab === 'Movies' && !activeItem ? 'active' : ''}`} onClick={() => handleNavClick('Movies', 'movie')}><Icon name="Movies" /> Movies</div>
+            <div className={`nav-item ${currentTab === 'TV Shows' && !activeItem ? 'active' : ''}`} onClick={() => handleNavClick('TV Shows', 'tv')}><Icon name="TV" /> TV Shows</div>
+            <div className={`nav-item ${currentTab === 'Anime' && !activeItem ? 'active' : ''}`} onClick={() => handleNavClick('Anime')}><Icon name="Anime" /> Anime</div>
+            <div className={`nav-item ${currentTab === 'Watch Later' && !activeItem ? 'active' : ''}`} onClick={() => handleNavClick('Watch Later')}><Icon name="Library" /> Watch Later</div>
+            <div className={`nav-item ${currentTab === 'Parties' && !activeItem ? 'active' : ''}`} onClick={() => handleNavClick('Parties')}><Icon name="Parties" /> Parties</div>
           </div>
         </div>
 
         <div className="header-right">
-          <div className="search-btn" onClick={() => { setIsSearchActive(!isSearchActive); setCurrentTab('Search'); }}>
+          <div className="search-btn" onClick={() => { setIsSearchActive(!isSearchActive); setCurrentTab('Search'); setActiveItem(null); }}>
             <Icon name="Search" />
           </div>
           
           {user ? (
             user?.photoURL ? (
-              <img src={user.photoURL} alt="Profile" className="user-avatar" onClick={() => setCurrentTab('Account')} title="My Account" />
+              <img src={user.photoURL} alt="Profile" className="user-avatar" onClick={() => { setCurrentTab('Account'); setActiveItem(null); }} title="My Account" />
             ) : (
-              <div className="user-avatar" onClick={() => setCurrentTab('Account')} title="My Account">
+              <div className="user-avatar" onClick={() => { setCurrentTab('Account'); setActiveItem(null); }} title="My Account">
                 {user?.email?.charAt(0)?.toUpperCase() || 'U'}
               </div>
             )
@@ -626,7 +627,7 @@ export default function App() {
       </header>
 
       {/* SEARCH BAR REVEAL */}
-      {(isSearchActive || currentTab === 'Search') && (
+      {(isSearchActive || currentTab === 'Search') && !activeItem && (
         <div className="search-bar-container" style={{ display: 'flex', justifyContent: 'center', padding: '20px 0' }}>
           <input 
             type="text" 
@@ -641,20 +642,16 @@ export default function App() {
 
       {/* --- DYNAMIC MAIN CONTENT --- */}
       
-      {/* CRITICAL FIX: 
-        activeItem is checked FIRST. This guarantees that clicking any movie (even from Watch Later) 
-        will overlay the Player Screen immediately. 
-      */}
       {activeItem ? (
         
-        /* --- PLAYER VIEW (WITH SPLIT PARTY WRAPPER) --- */
+        /* --- PLAYER VIEW --- */
         <div className="player-container" style={{ paddingTop: '40px', width: '100%', maxWidth: '1600px', margin: '0 auto', padding: '40px 40px 40px 40px' }}>
           <button onClick={() => { setActiveItem(null); setCurrentPartyCode(null); }} style={{ padding: '10px 20px', marginBottom: '20px', cursor: 'pointer', backgroundColor: '#1e293b', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold' }}>← Back</button>
           
           <div className="player-wrapper">
             
             {/* LEFT COLUMN: THE MOVIE & META */}
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ flex: 1, minWidth: 0, width: '100%', maxWidth: '100%' }}>
               
               <div className="iframe-container">
                 <iframe src={mediaType === 'movie' ? `https://vidsrc.net/embed/movie/${activeItem.id}` : `https://vidsrc.net/embed/tv?tmdb=${activeItem.id}&season=${season}&episode=${episode}`} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }} allowFullScreen></iframe>
@@ -1128,26 +1125,62 @@ export default function App() {
 
       {/* --- REWIRED MOBILE BOTTOM NAV --- */}
       <nav className="mobile-bottom-nav">
-        <div className={`mob-nav-item ${currentTab === 'Home' ? 'active' : ''}`} onClick={() => handleNavClick('Home', 'movie')}>
+        <div className={`mob-nav-item ${currentTab === 'Home' && !activeItem ? 'active' : ''}`} onClick={() => handleNavClick('Home', 'movie')}>
           <Icon name="Home" /> <span>Home</span>
         </div>
-        <div className={`mob-nav-item ${currentTab === 'Movies' ? 'active' : ''}`} onClick={() => handleNavClick('Movies', 'movie')}>
+        <div className={`mob-nav-item ${currentTab === 'Movies' && !activeItem ? 'active' : ''}`} onClick={() => handleNavClick('Movies', 'movie')}>
           <Icon name="Movies" /> <span>Movies</span>
         </div>
-        <div className={`mob-nav-item ${currentTab === 'TV Shows' ? 'active' : ''}`} onClick={() => handleNavClick('TV Shows', 'tv')}>
+        <div className={`mob-nav-item ${currentTab === 'TV Shows' && !activeItem ? 'active' : ''}`} onClick={() => handleNavClick('TV Shows', 'tv')}>
           <Icon name="TV" /> <span>TV</span>
         </div>
-        <div className={`mob-nav-item ${currentTab === 'Anime' ? 'active' : ''}`} onClick={() => handleNavClick('Anime')}>
+        <div className={`mob-nav-item ${currentTab === 'Anime' && !activeItem ? 'active' : ''}`} onClick={() => handleNavClick('Anime')}>
           <Icon name="Anime" /> <span>Anime</span>
         </div>
-        <div className={`mob-nav-item ${currentTab === 'Watch Later' ? 'active' : ''}`} onClick={() => handleNavClick('Watch Later')}>
+        <div className={`mob-nav-item ${currentTab === 'Watch Later' && !activeItem ? 'active' : ''}`} onClick={() => handleNavClick('Watch Later')}>
           <Icon name="Library" /> <span>Later</span>
         </div>
-        <div className={`mob-nav-item ${currentTab === 'Parties' ? 'active' : ''}`} onClick={() => handleNavClick('Parties')}>
+        <div className={`mob-nav-item ${currentTab === 'Parties' && !activeItem ? 'active' : ''}`} onClick={() => handleNavClick('Parties')}>
           <Icon name="Parties" /> <span>Parties</span>
         </div>
       </nav>
 
+    </div>
+  );
+}
+
+// --- REUSABLE COMPONENTS ---
+function MovieRow({ title, items, onClickItem, mediaType, isLive }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div style={{ marginBottom: '40px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '15px' }}>
+        <h3 style={{ fontSize: '1.5rem', margin: 0 }}>{title}</h3>
+        {isLive && <span style={{ backgroundColor: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', padding: '2px 6px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', border: '1px solid #ef4444' }}>Live</span>}
+      </div>
+      <div className="hide-scroll" style={{ display: 'flex', gap: '15px', overflowX: 'auto', paddingBottom: '15px' }}>
+        {items.filter(i => i.poster_path).map(item => (
+          <MovieCard key={item.id} item={item} onClick={() => onClickItem(item)} mediaType={mediaType} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MovieCard({ item, onClick, mediaType, isGrid }) {
+  const ratingScore = Math.round(item.vote_average * 10);
+  return (
+    <div className="movie-card" onClick={onClick} style={{ minWidth: isGrid ? '0' : '160px', width: isGrid ? '100%' : '160px', position: 'relative', borderRadius: '10px', overflow: 'hidden', cursor: 'pointer', backgroundColor: '#1e293b' }}>
+      <img src={`https://image.tmdb.org/t/p/w500${item.poster_path}`} alt={getTitle(item)} style={{ width: '100%', height: isGrid ? 'auto' : '240px', aspectRatio: isGrid ? '2/3' : 'auto', objectFit: 'cover', display: 'block' }} />
+      <div className="mobile-hide" style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: '60%', background: 'linear-gradient(0deg, rgba(0,0,0,0.95) 0%, transparent 100%)' }}></div>
+      <div style={{ position: 'absolute', top: '8px', left: '8px', backgroundColor: '#3b82f6', color: '#fff', padding: '3px 6px', borderRadius: '4px', fontSize: '0.65rem', fontWeight: '900' }}>✦ NEW</div>
+      <div style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: getRatingColor(item.vote_average), color: '#fff', padding: '3px 6px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: '900' }}>★ {ratingScore}%</div>
+      <div className="mobile-hide" style={{ position: 'absolute', bottom: '12px', left: '12px', right: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '6px', color: '#cbd5e1', fontSize: '0.75rem', fontWeight: 'bold' }}>
+          <span>{getYear(item)}</span>
+          <span style={{ textTransform: 'capitalize' }}>{mediaType}</span>
+        </div>
+      </div>
     </div>
   );
 }
